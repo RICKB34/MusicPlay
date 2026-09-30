@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- user-scalable=no: 游戏中禁止双指缩放，否则多点触摸会误触发页面缩放 -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#31c27c" />
+    <!-- iOS 全屏与状态栏。状态栏样式必须是 default：black-translucent 会把状态栏
+         文字强制成白色，而默认主题是白底，那样顶部文字会看不见。 -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="RhythmForge" />
+    <link rel="apple-touch-icon" href="/icon.svg" />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <title>Rhythm Forge — 音乐谱面生成器</title>
+    <!-- 必须在首屏渲染前定主题，否则赛博主题的用户每次刷新都会看到白→黑闪屏。
+         这里直接读 settings 的存储格式（schema 见 src/state/settings.ts 的 KEY），
+         两处要一起改。App 挂载后由 React 接管同一个属性。 -->
+    <script>
+      try {
+        var saved = JSON.parse(localStorage.getItem('rhythm-forge:settings:v1') || '{}')
+        document.documentElement.dataset.theme = saved.theme === 'acid' ? 'acid' : 'qq'
+      } catch (e) {
+        document.documentElement.dataset.theme = 'qq'
+      }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

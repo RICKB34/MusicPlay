@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: rhythm-forge
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 22.12.0

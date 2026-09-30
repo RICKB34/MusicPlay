@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- QQ 音乐主题配色：品牌绿底 + 白色轨道/音符 -->
+  <rect width="512" height="512" rx="96" fill="#31c27c"/>
+  <!-- 四条下落轨道 -->
+  <g opacity="0.32" fill="#ffffff">
+    <rect x="96" y="72" width="64" height="368" rx="12"/>
+    <rect x="176" y="72" width="64" height="368" rx="12"/>
+    <rect x="256" y="72" width="64" height="368" rx="12"/>
+    <rect x="336" y="72" width="64" height="368" rx="12"/>
+  </g>
+  <!-- 音符 -->
+  <rect x="96" y="150" width="64" height="34" rx="10" fill="#ffffff"/>
+  <rect x="256" y="240" width="64" height="34" rx="10" fill="#ffffff" opacity="0.72"/>
+  <rect x="336" y="330" width="64" height="34" rx="10" fill="#ffffff"/>
+  <!-- 判定线 -->
+  <rect x="72" y="416" width="368" height="10" rx="5" fill="#ffffff"/>
+</svg>

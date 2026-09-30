@@ -1,0 +1,81 @@
+/**
+ * 联机协议 —— 前后端共享的消息类型定义。
+ *
+ * 协议刻意做得极小（十来种消息）。我们需要的不是通用房间框架，
+ * 而是"两人用同一份谱面同时开打"这一件事，自己写比对抗
+ * Colyseus 的状态同步模型或 Durable Objects 的存储抽象都省事。
+ *
+ * 时间戳约定：所有 `*Ms` 都是**毫秒**。客户端时间用
+ * `performance.timeOrigin + performance.now()`（单调，不受系统对时影响），
+ * 服务端用 `Date.now()`，两者靠 NTP 式握手换算。
+ */
+
+import type { Chart } from '../types'
+
+// ─────────────────────────── 客户端 → 服务端 ───────────────────────────
+
+export type ClientMessage =
+  /** 时钟同步请求。`t0` 为客户端发出时刻。 */
+  | { t: 'PING'; cid: number; t0: number }
+  | { t: 'CREATE_ROOM' }
+  | { t: 'JOIN_ROOM'; roomCode: string }
+  /** 房主提交谱面，服务端转发给对手。 */
+  | { t: 'SUBMIT_CHART'; chart: Chart; fingerprint: string }
+  | { t: 'READY'; ready: boolean }
+  /** 节流上报（2Hz 足够画个进度条）。 */
+  | {
+      t: 'SCORE_UPDATE'
+      score: number
+      combo: number
+      maxCombo: number
+      accuracy: number
+      progress: number
+    }
+  | { t: 'FINISH'; score: number; accuracy: number; maxCombo: number }
+  | { t: 'LEAVE' }
+
+// ─────────────────────────── 服务端 → 客户端 ───────────────────────────
+
+export type ServerMessage =
+  /**
+   * 时钟同步应答。
+   * `t1` = 服务端收到 PING 的时刻，`t2` = 服务端发出 PONG 的时刻。
+   * 两者之差就是服务端的处理耗时，需要从 RTT 里扣除。
+   */
+  | { t: 'PONG'; cid: number; t0: number; t1: number; t2: number }
+  | { t: 'ROOM_CREATED'; roomCode: string; playerId: string }
+  | { t: 'JOINED'; roomCode: string; playerId: string }
+  | { t: 'PLAYER_JOINED'; playerId: string }
+  | { t: 'PLAYER_LEFT'; playerId: string }
+  | { t: 'ERROR'; message: string }
+  /** 房主收到的回执 / 对手收到的谱面。 */
+  | { t: 'CHART_RECEIVED'; chart: Chart; fingerprint: string }
+  | { t: 'OPPONENT_READY'; ready: boolean }
+  /** ★ 权威时间轴：双方都必须在 `startAtServerMs` 这一刻开始播放。 */
+  | { t: 'COUNTDOWN'; startAtServerMs: number; leadMs: number }
+  | {
+      t: 'OPPONENT_SCORE'
+      score: number
+      combo: number
+      maxCombo: number
+      accuracy: number
+      progress: number
+    }
+  | { t: 'OPPONENT_FINISHED'; score: number; accuracy: number; maxCombo: number }
+  | {
+      t: 'FINAL_RESULT'
+      players: { playerId: string; score: number; accuracy: number; maxCombo: number }[]
+      winnerId: string | null
+    }
+
+/** 房间码字符集：去掉 0/O/1/I 这些容易看错的。 */
+export const ROOM_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+export const ROOM_CODE_LENGTH = 4
+
+/** 服务器下发的提前量（毫秒）。够双方加载音频、切换界面。 */
+export const COUNTDOWN_LEAD_MS = 4000
+
+export function isValidRoomCode(code: string): boolean {
+  if (code.length !== ROOM_CODE_LENGTH) return false
+  return [...code.toUpperCase()].every((c) => ROOM_CODE_ALPHABET.includes(c))
+}

@@ -1,0 +1,1925 @@
+/* 全局样式 —— 六套主题：QQ 音乐（默认）/ 赛博（Acid Graphics）/ 粘土拟态（Claymorphism）
+ * / 霓虹复古（Vaporwave）/ 像素艺术（Pixel Art）/ 水墨画风（Ink Wash）
+ *
+ * 主题由 <html data-theme="qq|acid|clay|vapor|pixel|ink"> 驱动。**组件规则只写一份**，
+ * 主题块只提供变量值。
+ *
+ * 两条必须遵守的约定：
+ *   1. 变量存"完整属性值"（整个 box-shadow / border 简写），不拆零件。两套主题的
+ *      阴影结构不同（赛博是 `Npx Npx 0 color` 零模糊单层，QQ 是柔和多层），拆零件无解；
+ *      且 box-shadow 是逗号列表，`none` 只能作为整体值。
+ *   2. :root 必须**始终**持有全套变量。var() 找不到变量时是**静默失败**的
+ *      （border 变无边框、background 变透明），编译器不报错、控制台不警告。
+ *      theme.test.ts 会断言两个主题块的变量名集合完全相等，兜住这一点。
+ *
+ * 手法：变体类只赋变量，状态规则只声明属性。自定义属性是继承的、在元素上解析、
+ * 与状态无关，所以 `.seg button { --lift: none }` 这种低特异性赋值能生效，
+ * `button:hover` 读到的就是变体覆盖后的值 —— 因此不需要写 `.seg button:hover`
+ * 这类"变体 × 状态"的覆盖规则。
+ *
+ * 以下功能性属性**原样保留**，任何时候都不要改：
+ *   - .app 的 env(safe-area-inset-*)：iPhone 刘海/底部横条避让
+ *   - button 的 min-height:44px：移动端触摸目标尺寸
+ *   - .game-canvas 的 touch-action:none：否则多点触摸会触发页面缩放
+ *   - body 的 overscroll-behavior / tap-highlight：防移动端误滚与灰块
+ *   - .progress 用 box-shadow 描边而非 border：GameScreen 传了内联 height:4，
+ *     border-box 下 border 会吃光高度
+ */
+
+/* ══════════════ 主题：QQ 音乐（默认） ══════════════
+ * #31C27C 的亮度 L=0.4069，压白字只有 2.30:1，**低于 WCAG AA 的 4.5:1**。
+ *
+ * 主按钮（--btn-primary-*）仍按 QQ 音乐 App 的做法用绿底白字——这是**有意的
+ * 品牌取舍**，不要"顺手修"成深色文字。除此之外的场景一律用深绿 #0A7F4D（5.05:1）：
+ * 正文、图标、焦点环、以及白底上的绿色文字（品牌绿当文字色同样只有 2.30:1）。
+ */
+:root {
+  /* 颜色 */
+  --bg: #f5f6f7;
+  --surface: #ffffff;
+  --surface-2: #f7f8fa;
+  --divider: #ebedf0;
+  --text: #1a1a1a;
+  --text-dim: #606266;
+  --accent: #31c27c; /* 仅用于填充 */
+  --accent-text: #0a7f4d; /* 文字与图标，5.05:1 */
+  --on-accent: #ffffff;
+  --danger: #d93025;
+  --warning: #8f5a00;
+  --success: #0a7f4d;
+  --focus-ring: #0a7f4d;
+
+  /* 形状 */
+  --radius-card: 12px;
+  --radius-control: 8px;
+  --radius-btn: 10px;
+  --card-border: 1px solid var(--divider);
+  --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --control-border: 1px solid #c8c9cc;
+
+  /* 排印 */
+  --font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei',
+    sans-serif;
+  --tt-heading: none;
+  --tt-label: none;
+  --ls-heading: 0;
+  --ls-label: 0;
+  --fw-heading: 600;
+  --brand-shadow: none;
+  --grade-shadow: none;
+
+  /* 动效 */
+  --dur: 180ms;
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --lift: translateY(-1px);
+  --press: translateY(0);
+  --scanline: none;
+  --heading-transform: none;
+  --heading-origin: center;
+
+  /* 按钮：结构层（与变体无关） */
+  --btn-shadow: none;
+  --btn-shadow-hover: 0 2px 8px rgba(0, 0, 0, 0.12);
+  --btn-shadow-active: none;
+
+  /* 按钮：颜色层 —— 默认（次要）变体 */
+  --btn-bg: #ffffff;
+  --btn-fg: #1a1a1a;
+  --btn-border-c: #c8c9cc;
+  --btn-bg-hover: #f0f1f3;
+  --btn-fg-hover: #1a1a1a;
+  --btn-border-c-hover: #c8c9cc;
+
+  /* 按钮：主色变体 */
+  --btn-primary-bg: #31c27c;
+  --btn-primary-fg: #ffffff;
+  --btn-primary-border-c: #31c27c;
+  --btn-primary-bg-hover: #2eb374;
+  --btn-primary-fg-hover: #ffffff;
+  --btn-primary-border-c-hover: #2eb374;
+
+  /* 按钮：幽灵变体 */
+  --btn-ghost-bg: transparent;
+  --btn-ghost-fg: #606266;
+  --btn-ghost-border-c: transparent;
+  --btn-ghost-bg-hover: #f0f1f3;
+  --btn-ghost-fg-hover: #1a1a1a;
+  --btn-ghost-border-c-hover: transparent;
+
+  /* 分段控件 */
+  --seg-track-bg: #f0f1f3;
+  --seg-border: 2px solid transparent;
+  --seg-radius: 8px;
+  --seg-fg: #606266;
+  --seg-fg-hover: #1a1a1a;
+  --seg-hover-bg: #e6e8eb;
+  --seg-active-bg: #31c27c;
+  --seg-active-fg: #ffffff;
+
+  /* 杂项 */
+  --overlay-scrim: rgba(255, 255, 255, 0.94);
+  /* 开场倒计时用的浅遮罩：让游戏画面透出来，避免"糊一下再出现" */
+  --overlay-scrim-soft: rgba(255, 255, 255, 0.82);
+  --code-bg: #f0f1f3;
+  --code-border: 1px solid var(--divider);
+  --code-fg: #0a7f4d;
+  --input-border: 1px solid #c8c9cc;
+  --input-border-focus: 1px solid var(--accent);
+  --input-fg: #1a1a1a;
+  --input-caret: #31c27c;
+  --input-bg: #ffffff;
+  --placeholder-fg: #a8abb2;
+  --input-focus-shadow: 0 0 0 3px rgba(49, 194, 124, 0.25);
+  --note-bg: #f7f8fa;
+  --note-border: 1px solid var(--divider);
+  --note-shadow: none;
+  --stat-bg: #f7f8fa;
+  --stat-border: 1px solid var(--divider);
+  --stat-shadow: none;
+  --progress-bg: #f0f1f3;
+  --progress-fill: #31c27c;
+  --progress-shadow: none;
+  --progress-radius: 4px;
+  --progress-transition: width var(--dur) var(--ease);
+  --badge-radius: 6px;
+  --badge-border-w: 1px;
+  --dot-radius: 999px;
+  --btn-border-w: 2px;
+  --badge-good-bg: rgba(49, 194, 124, 0.12);
+  --badge-good-fg: #0a7f4d;
+  --badge-warn-bg: rgba(143, 90, 0, 0.12);
+  --badge-warn-fg: #8f5a00;
+  --badge-bad-bg: rgba(217, 48, 37, 0.12);
+  --badge-bad-fg: #d93025;
+  --disabled-opacity: 0.45;
+
+  /* 主题选择器的选中项。刻意**不**复用 --seg-active-*：那是饱和底 + 白字，
+   * 分段控件里只有一个词、且是短标签，这里却有主题名 + 一整句说明。
+   * 白字压在 #31c27c 上只有 2.3:1，说明文字再降一点透明度就掉到 1.9:1，
+   * 实际是糊的。改成淡色底 + 深色字（同 .badge.good 的手法），4.5:1 起。 */
+  --pick-active-bg: rgba(49, 194, 124, 0.14);
+  --pick-active-fg: #0a7f4d;
+  --pick-active-border-c: #31c27c;
+
+  color-scheme: light;
+}
+
+/* ══════════════ 主题：赛博（Acid Graphics） ══════════════ */
+:root[data-theme='acid'] {
+  --bg: #0a0a0a;
+  --surface: #111111;
+  --surface-2: #161616;
+  --divider: #39ff14;
+  --text: #39ff14;
+  --text-dim: rgba(57, 255, 20, 0.7);
+  --accent: #39ff14;
+  --accent-text: #39ff14;
+  --on-accent: #0a0a0a;
+  --danger: #ff6ec7;
+  --warning: #e6ff00;
+  --success: #39ff14;
+  --focus-ring: #e6ff00;
+
+  --radius-card: 0;
+  --radius-control: 0;
+  --radius-btn: 0;
+  --card-border: 2px solid #39ff14;
+  --card-shadow: 5px 5px 0 #a020f0;
+  --control-border: 2px solid rgba(57, 255, 20, 0.6);
+
+  --font-ui: ui-monospace, 'SFMono-Regular', 'Cascadia Mono', Consolas, 'DejaVu Sans Mono',
+    'Sarasa Mono SC', 'Microsoft YaHei', monospace;
+  --tt-heading: uppercase;
+  --tt-label: uppercase;
+  --ls-heading: 0.06em;
+  --ls-label: 0.1em;
+  --fw-heading: 900;
+  --brand-shadow: 3px 3px 0 #a020f0, 6px 6px 0 #ff6ec7;
+  --grade-shadow: 4px 4px 0 #a020f0, 8px 8px 0 #ff6ec7;
+
+  /* 生硬动效：75ms 线性，没有缓入缓出 */
+  --dur: 75ms;
+  --ease: linear;
+  --lift: translate(2px, 2px) skewX(-6deg);
+  --press: translate(4px, 4px) skewX(-6deg);
+  --scanline: repeating-linear-gradient(
+    to bottom,
+    rgba(57, 255, 20, 0.028) 0,
+    rgba(57, 255, 20, 0.028) 1px,
+    transparent 1px,
+    transparent 4px
+  );
+  --heading-transform: skewX(-5deg);
+  --heading-origin: left center;
+
+  --btn-shadow: 4px 4px 0 #e6ff00;
+  --btn-shadow-hover: 8px 8px 0 #a020f0;
+  --btn-shadow-active: 0 0 0 #a020f0;
+
+  --btn-bg: #a020f0;
+  --btn-fg: #39ff14;
+  --btn-border-c: #39ff14;
+  --btn-bg-hover: #39ff14;
+  --btn-fg-hover: #0a0a0a;
+  --btn-border-c-hover: #39ff14;
+
+  --btn-primary-bg: #39ff14;
+  --btn-primary-fg: #0a0a0a;
+  --btn-primary-border-c: #39ff14;
+  --btn-primary-bg-hover: #e6ff00;
+  --btn-primary-fg-hover: #0a0a0a;
+  --btn-primary-border-c-hover: #e6ff00;
+
+  --btn-ghost-bg: transparent;
+  --btn-ghost-fg: #39ff14;
+  --btn-ghost-border-c: #39ff14;
+  --btn-ghost-bg-hover: #39ff14;
+  --btn-ghost-fg-hover: #0a0a0a;
+  --btn-ghost-border-c-hover: #39ff14;
+
+  --seg-track-bg: transparent;
+  --seg-border: 2px solid #39ff14;
+  --seg-radius: 0;
+  --seg-fg: #39ff14;
+  --seg-fg-hover: #0a0a0a;
+  --seg-hover-bg: #e6ff00;
+  --seg-active-bg: #39ff14;
+  --seg-active-fg: #0a0a0a;
+
+  --overlay-scrim: rgba(10, 10, 10, 0.92);
+  --overlay-scrim-soft: rgba(10, 10, 10, 0.72);
+  --code-bg: #161616;
+  --code-border: 1px solid #a020f0;
+  --code-fg: #e6ff00;
+  --input-border: 2px solid rgba(57, 255, 20, 0.6);
+  --input-border-focus: 2px solid #39ff14;
+  --input-fg: #39ff14;
+  --input-caret: #39ff14;
+  --input-bg: #0a0a0a;
+  --placeholder-fg: rgba(57, 255, 20, 0.4);
+  --input-focus-shadow: 3px 3px 0 #ff6ec7;
+  --note-bg: #161616;
+  --note-border: 2px solid #a020f0;
+  --note-shadow: none;
+  --stat-bg: #161616;
+  --stat-border: 2px solid #a020f0;
+  --stat-shadow: none;
+  --progress-bg: #161616;
+  --progress-fill: #39ff14;
+  --progress-shadow: 0 0 0 2px #39ff14;
+  --progress-radius: 0;
+  --progress-transition: width 75ms steps(4, end);
+  --badge-radius: 0;
+  --badge-border-w: 2px;
+  --dot-radius: 999px;
+  --btn-border-w: 2px;
+  --badge-good-bg: #39ff14;
+  --badge-good-fg: #0a0a0a;
+  --badge-warn-bg: #e6ff00;
+  --badge-warn-fg: #0a0a0a;
+  --badge-bad-bg: #ff6ec7;
+  --badge-bad-fg: #0a0a0a;
+  --disabled-opacity: 0.4;
+
+  --pick-active-bg: rgba(57, 255, 20, 0.16);
+  --pick-active-fg: #39ff14;
+  --pick-active-border-c: #39ff14;
+
+  color-scheme: dark;
+}
+
+/* ══════════════ 主题：粘土拟态（Claymorphism） ══════════════
+ * 超大圆角 + 内外阴影组合 + 糖果色渐变，模拟橡皮泥的软糯 3D 质感。
+ *
+ * 三处结构性差别（不只是换色）：
+ *   1. 边框一律 `2px solid transparent` 而非 `none` —— 保留占位，切换主题时
+ *      按钮/卡片尺寸不跳动，视觉上又等于无边框（background 默认铺到 border-box）。
+ *   2. `--press` 是 scale(1.05, 0.9) 的**挤压形变**，不是位移。粘土被按下去是
+ *      变扁变宽，不是平移；同时 active 阴影把内阴影从 4px 加深到 8px 模拟凹陷。
+ *   3. `--ease` 是带 overshoot 的弹簧曲线（cubic-bezier 第二段 >1），松手回弹。
+ *      **进度条例外**：overshoot 会让宽度冲过 100% 再弹回，轨道虽然 overflow:hidden
+ *      裁得掉，但抽帧看是"满格闪一下"。所以 --progress-transition 单独用无回弹的
+ *      减速曲线，而不是共用 --ease。
+ *
+ * 正文用 pink-800/700 而非官方 token 里的粉 400 系：浅粉底上 #f472b6 只有 2.4:1，
+ * 读不出来。糖果色留给填充块（音符、按钮、进度条），文字一律深化到 6:1 以上。
+ */
+:root[data-theme='clay'] {
+  /* 颜色：奶油粉底 + 糖果色填充 */
+  --bg: linear-gradient(to bottom right, #fef3c7, #fce7f3 45%, #ede9fe);
+  --surface: linear-gradient(to bottom right, #ffffff, #fdf2f8);
+  --surface-2: #fdf2f8;
+  --divider: #fbcfe8;
+  --text: #9d174d; /* pink-800，白底 7.9:1 */
+  --text-dim: #be185d; /* pink-700，白底 6.0:1 */
+  --accent: #f472b6; /* 仅用于填充 */
+  --accent-text: #be185d; /* 文字与图标 */
+  --on-accent: #ffffff;
+  --danger: #dc2626;
+  --warning: #b45309;
+  --success: #15803d;
+  --focus-ring: #be185d;
+
+  /* 形状：超大圆角，按钮走胶囊 */
+  --radius-card: 32px;
+  --radius-control: 20px;
+  --radius-btn: 999px;
+  --card-border: 1px solid transparent;
+  --card-shadow: 12px 12px 24px rgba(0, 0, 0, 0.1), inset 6px 6px 12px rgba(255, 255, 255, 0.6),
+    inset -4px -4px 8px rgba(0, 0, 0, 0.05);
+  --control-border: 2px solid transparent;
+
+  /* 排印：圆体优先，不做大写与宽字距（那是赛博的手法） */
+  --font-ui: ui-rounded, 'Varela Round', 'Quicksand', 'Nunito', 'PingFang SC', 'Microsoft YaHei',
+    sans-serif;
+  --tt-heading: none;
+  --tt-label: none;
+  --ls-heading: 0;
+  --ls-label: 0;
+  --fw-heading: 800;
+  --brand-shadow: 0 6px 16px rgba(244, 114, 182, 0.35);
+  --grade-shadow: 0 8px 20px rgba(244, 114, 182, 0.4);
+
+  /* 动效：弹簧缓动 + 挤压形变 */
+  --dur: 300ms;
+  --ease: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --lift: translateY(-4px);
+  --press: scale(1.05, 0.9);
+  --scanline: none;
+  --heading-transform: none;
+  --heading-origin: center;
+
+  /* 按钮：结构层 —— 外凸 → 悬停抬起 → 按压凹陷 */
+  --btn-shadow: 6px 6px 12px rgba(0, 0, 0, 0.1), inset 4px 4px 8px rgba(255, 255, 255, 0.55),
+    inset -2px -2px 4px rgba(0, 0, 0, 0.08);
+  --btn-shadow-hover: 10px 10px 20px rgba(0, 0, 0, 0.12), inset 4px 4px 8px rgba(255, 255, 255, 0.55),
+    inset -2px -2px 4px rgba(0, 0, 0, 0.08);
+  --btn-shadow-active: 2px 2px 4px rgba(0, 0, 0, 0.05), inset 8px 8px 16px rgba(0, 0, 0, 0.15),
+    inset -4px -4px 8px rgba(255, 255, 255, 0.5);
+
+  /* 按钮：颜色层 —— 默认（次要）变体用奶油色 */
+  --btn-bg: linear-gradient(to bottom, #fef3c7, #fde68a);
+  --btn-fg: #b45309;
+  --btn-border-c: transparent;
+  --btn-bg-hover: linear-gradient(to bottom, #fef9e7, #fef3c7);
+  --btn-fg-hover: #92400e;
+  --btn-border-c-hover: transparent;
+
+  /* 按钮：主色变体 —— 官方 token 的 from-pink-300 to-pink-400 + 白字 */
+  --btn-primary-bg: linear-gradient(to bottom, #f9a8d4, #f472b6);
+  --btn-primary-fg: #ffffff;
+  --btn-primary-border-c: transparent;
+  --btn-primary-bg-hover: linear-gradient(to bottom, #fbcfe8, #f9a8d4);
+  --btn-primary-fg-hover: #ffffff;
+  --btn-primary-border-c-hover: transparent;
+
+  /* 按钮：幽灵变体 */
+  --btn-ghost-bg: transparent;
+  --btn-ghost-fg: #be185d;
+  --btn-ghost-border-c: transparent;
+  --btn-ghost-bg-hover: rgba(249, 168, 212, 0.25);
+  --btn-ghost-fg-hover: #9d174d;
+  --btn-ghost-border-c-hover: transparent;
+
+  /* 分段控件：内凹轨道 + 外凸选中块 */
+  --seg-track-bg: linear-gradient(to bottom, #fce7f3, #fbcfe8);
+  --seg-border: 2px solid transparent;
+  --seg-radius: 999px;
+  --seg-fg: #be185d;
+  --seg-fg-hover: #9d174d;
+  --seg-hover-bg: rgba(255, 255, 255, 0.65);
+  --seg-active-bg: linear-gradient(to bottom, #f9a8d4, #f472b6);
+  --seg-active-fg: #ffffff;
+
+  /* 杂项 */
+  --overlay-scrim: rgba(253, 242, 248, 0.94);
+  --overlay-scrim-soft: rgba(253, 242, 248, 0.82);
+  --code-bg: #fce7f3;
+  --code-border: 1px solid transparent;
+  --code-fg: #be185d;
+  --input-border: 2px solid transparent;
+  --input-border-focus: 2px solid #f9a8d4;
+  --input-fg: #9d174d;
+  --input-caret: #f472b6;
+  --input-bg: linear-gradient(to bottom, #f3f4f6, #e5e7eb);
+  --placeholder-fg: rgba(157, 23, 77, 0.45);
+  --input-focus-shadow: inset 4px 4px 8px rgba(0, 0, 0, 0.1),
+    inset -4px -4px 8px rgba(255, 255, 255, 0.9), 0 0 0 4px rgba(248, 180, 217, 0.3);
+  --note-bg: linear-gradient(to bottom right, #ffffff, #fdf2f8);
+  --note-border: 1px solid transparent;
+  --note-shadow: 8px 8px 16px rgba(0, 0, 0, 0.1), inset 4px 4px 8px rgba(255, 255, 255, 0.4),
+    inset -2px -2px 4px rgba(0, 0, 0, 0.1);
+  --stat-bg: linear-gradient(to bottom right, #ffffff, #fdf2f8);
+  --stat-border: 1px solid transparent;
+  --stat-shadow: 8px 8px 16px rgba(0, 0, 0, 0.1), inset 4px 4px 8px rgba(255, 255, 255, 0.4),
+    inset -2px -2px 4px rgba(0, 0, 0, 0.1);
+  --progress-bg: linear-gradient(to bottom, #fce7f3, #fbcfe8);
+  --progress-fill: #f472b6;
+  --progress-shadow: inset 2px 2px 4px rgba(0, 0, 0, 0.08);
+  --progress-radius: 999px;
+  /* 进度条不共用 --ease：弹簧曲线的 overshoot 会让宽度冲过 100% 再弹回 */
+  --progress-transition: width 300ms cubic-bezier(0.22, 1, 0.36, 1);
+  --badge-radius: 999px;
+  --badge-border-w: 1px;
+  --dot-radius: 999px;
+  --btn-border-w: 2px;
+  --badge-good-bg: rgba(21, 128, 61, 0.14);
+  --badge-good-fg: #15803d;
+  --badge-warn-bg: rgba(180, 83, 9, 0.14);
+  --badge-warn-fg: #b45309;
+  --badge-bad-bg: rgba(220, 38, 38, 0.14);
+  --badge-bad-fg: #dc2626;
+  --disabled-opacity: 0.5;
+
+  --pick-active-bg: rgba(244, 114, 182, 0.2);
+  --pick-active-fg: #9d174d;
+  --pick-active-border-c: #f472b6;
+
+  color-scheme: light;
+}
+
+/* ══════════════ 主题：霓虹复古（Vaporwave） ══════════════
+ * 深紫底 + 粉(#ff71ce)青(#01cdfe)双色霓虹 + 网格线。
+ *
+ * 几处按本项目变量系统做的取舍（规范里的写法在这里落不了地）：
+ *
+ *   1. **主标题不做渐变文字**。规范一边 REQUIRED `bg-clip-text` 渐变标题，
+ *      一边在自检清单里禁止 `background-clip: text`。按硬提示里"禁止项优先级
+ *      最高"处理，改用双色 text-shadow 重影（--brand-shadow）——粉光晕 + 青偏移，
+ *      这本来也是蒸汽波比渐变字更经典的招牌手法，而且 .brand 早就备好了这个插槽。
+ *   2. **网格而不是扫描线**。--scanline 挂在 .screen::before 上，只能是一个
+ *      background 简写，所以位置/尺寸要写进简写里（`... 0 0 / 44px 44px`）。
+ *      赛博是无尺寸的重复渐变，不受影响。
+ *   3. **字距收到 0.08em**。规范的 tracking-[0.2em] 是给英文标题的，中文标题
+ *      （"选一首歌"）拉到 0.2em 会散成四个孤立字。
+ *   4. **--dur 取 500ms**，对应"漂浮式慢节奏"。代价是按下反馈也慢半拍——
+ *      规范要的 active 即时反馈在本项目里做不到，--dur 同时管 hover 与 active，
+ *      拆成两个变量要动全局 button 规则。慢节奏是硬要求，按下快慢是细节。
+ *
+ * 正文色用全不透明的 #b967ff 而非规范里的 `#b967ff/70`：压在深紫底上只有 3.4:1，
+ * 正文读不了。全不透明是 5.7:1，仍然弱于 --text 的 7.5:1，层级由明度差表达。
+ */
+:root[data-theme='vapor'] {
+  /* 颜色：深紫底 + 霓虹色 */
+  --bg: linear-gradient(to bottom, #38095c 0%, #20093c 45%, #140826 100%);
+  /* 表面一律**不透明**。规范给的 `bg-[#1a0a2e]/60` 那种半透明表面在本项目里会出
+   * 事：主题选项、统计块、输入框都是嵌在卡片里的，半透明叠半透明 = 每层都比
+   * 上一层亮，正是自检清单里禁止的"卡片里套卡片"。取卡片叠完之后的实际色值，
+   * 层级改用明度差表达（内嵌块比卡片亮一档、凹陷块比卡片暗一档）。 */
+  --surface: #26063f;
+  --surface-2: #320a52;
+  --divider: rgba(255, 113, 206, 0.3);
+  --text: #ff71ce; /* 深紫底 7.5:1 */
+  --text-dim: #b967ff; /* 5.7:1，比 --text 弱但仍在 AA 之上 */
+  --accent: #ff71ce;
+  --accent-text: #ff71ce;
+  --on-accent: #1a0a2e;
+  --danger: #ff5f7e;
+  --warning: #fffb96;
+  --success: #05ffa1;
+  --focus-ring: #01cdfe;
+
+  /* 形状：rounded-xl，粉光晕 + 青硬偏移做双色重影 */
+  --radius-card: 12px;
+  --radius-control: 12px;
+  --radius-btn: 12px;
+  --card-border: 1px solid rgba(255, 113, 206, 0.5);
+  --card-shadow: 0 0 24px rgba(255, 113, 206, 0.35), 4px 4px 0 rgba(1, 205, 254, 0.4);
+  --control-border: 1px solid rgba(185, 103, 255, 0.5);
+
+  /* 排印：等宽 + 全大写 + 极粗 */
+  --font-ui: ui-monospace, 'Cascadia Mono', Consolas, 'Sarasa Mono SC', 'Microsoft YaHei', monospace;
+  --tt-heading: uppercase;
+  --tt-label: uppercase;
+  --ls-heading: 0.08em; /* 规范的 0.2em 会把中文标题拉散，见文件上方说明 */
+  --ls-label: 0.12em;
+  --fw-heading: 900;
+  --brand-shadow: 0 0 18px rgba(255, 113, 206, 0.9), 4px 4px 0 rgba(1, 205, 254, 0.8);
+  --grade-shadow: 0 0 28px rgba(255, 113, 206, 0.8), 5px 5px 0 rgba(1, 205, 254, 0.75);
+
+  /* 动效：慢速漂浮 + glitch 错位 */
+  --dur: 500ms;
+  --ease: cubic-bezier(0.16, 1, 0.3, 1); /* 梦幻减速，非 bounce/elastic */
+  --lift: translateY(-4px);
+  --press: translate(5px, 5px); /* 旧系统错误弹窗式的突兀错位 */
+  /* 粉青双色网格。位置/尺寸必须写进简写里，::before 只接一个 background 值。 */
+  --scanline: linear-gradient(rgba(255, 113, 206, 0.09) 1px, transparent 1px) 0 0 / 44px 44px,
+    linear-gradient(90deg, rgba(1, 205, 254, 0.09) 1px, transparent 1px) 0 0 / 44px 44px;
+  --heading-transform: none;
+  --heading-origin: center;
+
+  /* 按钮：外发光 → hover 翻青光 + 粉重影 → active 光全灭（glitch 落地） */
+  --btn-shadow: 0 0 16px rgba(255, 113, 206, 0.5);
+  --btn-shadow-hover: 0 0 32px rgba(1, 205, 254, 0.7), 4px 4px 0 rgba(255, 113, 206, 0.45);
+  --btn-shadow-active: none;
+
+  /* 按钮：默认（次要）变体用霓虹青 */
+  --btn-bg: rgba(1, 205, 254, 0.14);
+  --btn-fg: #01cdfe;
+  --btn-border-c: rgba(1, 205, 254, 0.5);
+  --btn-bg-hover: rgba(1, 205, 254, 0.26);
+  --btn-fg-hover: #01cdfe;
+  --btn-border-c-hover: #01cdfe;
+
+  /* 按钮：主色变体 —— 粉紫渐变，hover 时**反转**，这就是规范要的"渐变流动" */
+  --btn-primary-bg: linear-gradient(to right, #ff71ce, #b967ff);
+  --btn-primary-fg: #ffffff;
+  --btn-primary-border-c: rgba(255, 113, 206, 0.6);
+  --btn-primary-bg-hover: linear-gradient(to right, #b967ff, #ff71ce);
+  --btn-primary-fg-hover: #ffffff;
+  --btn-primary-border-c-hover: #01cdfe;
+
+  /* 按钮：幽灵变体 */
+  --btn-ghost-bg: transparent;
+  --btn-ghost-fg: #b967ff;
+  --btn-ghost-border-c: rgba(185, 103, 255, 0.45);
+  --btn-ghost-bg-hover: rgba(185, 103, 255, 0.2);
+  --btn-ghost-fg-hover: #ff71ce;
+  --btn-ghost-border-c-hover: #ff71ce;
+
+  /* 分段控件 */
+  --seg-track-bg: #1c0a35;
+  --seg-border: 1px solid rgba(185, 103, 255, 0.4);
+  --seg-radius: 12px;
+  --seg-fg: #b967ff;
+  --seg-fg-hover: #ff71ce;
+  --seg-hover-bg: rgba(185, 103, 255, 0.22);
+  --seg-active-bg: linear-gradient(to right, #ff71ce, #b967ff);
+  --seg-active-fg: #ffffff;
+
+  /* 杂项 */
+  --overlay-scrim: rgba(18, 8, 34, 0.94);
+  --overlay-scrim-soft: rgba(18, 8, 34, 0.82);
+  --code-bg: #1c0a35;
+  --code-border: 1px solid rgba(1, 205, 254, 0.35);
+  --code-fg: #01cdfe;
+  --input-border: 1px solid rgba(185, 103, 255, 0.5);
+  --input-border-focus: 1px solid #01cdfe;
+  --input-fg: #01cdfe;
+  --input-caret: #01cdfe;
+  --input-bg: #1e0b38; /* 比卡片暗一档，读作"凹进去的输入位" */
+  --placeholder-fg: rgba(185, 103, 255, 0.7);
+  --input-focus-shadow: 0 0 20px rgba(1, 205, 254, 0.6);
+  --note-bg: #320a52;
+  --note-border: 1px solid rgba(1, 205, 254, 0.3);
+  --note-shadow: 0 0 16px rgba(255, 113, 206, 0.22);
+  --stat-bg: #320a52;
+  --stat-border: 1px solid rgba(255, 113, 206, 0.3);
+  --stat-shadow: 0 0 16px rgba(255, 113, 206, 0.22);
+  --progress-bg: #1c0a35;
+  --progress-fill: linear-gradient(to right, #ff71ce, #01cdfe);
+  --progress-shadow: 0 0 12px rgba(255, 113, 206, 0.4);
+  --progress-radius: 999px;
+  --progress-transition: width 700ms cubic-bezier(0.16, 1, 0.3, 1);
+  --badge-radius: 999px;
+  --badge-border-w: 1px;
+  --dot-radius: 999px;
+  --btn-border-w: 2px;
+  --badge-good-bg: rgba(5, 255, 161, 0.16);
+  --badge-good-fg: #05ffa1;
+  --badge-warn-bg: rgba(255, 251, 150, 0.16);
+  --badge-warn-fg: #fffb96;
+  --badge-bad-bg: rgba(255, 95, 126, 0.18);
+  --badge-bad-fg: #ff5f7e;
+  --disabled-opacity: 0.4;
+
+  --pick-active-bg: rgba(255, 113, 206, 0.16);
+  --pick-active-fg: #ff71ce;
+  --pick-active-border-c: #ff71ce;
+
+  color-scheme: dark;
+}
+
+/* ══════════════ 主题：像素艺术风（Pixel Art） ══════════════
+ * PICO-8 调色板 + 零圆角 + 4px 粗边框 + 硬边偏移阴影，浅色底。
+ *
+ * 三处按本项目的结构做的落实：
+ *
+ *   1. **--dur: 0ms 就是 transition-none**。规范要的 "Absolute Zero" 是全局禁用过渡，
+ *      而本项目的所有动效时长都从这个变量取，置 0 等价于硬切，且不必逐个组件改。
+ *      --ease 此时无意义，给 linear 只为满足"变量必须有值"。
+ *   2. **位移量恒等于阴影偏移量**（都是 4px）。规范特意强调这两者必须相等，
+ *      不等就穿帮——所以 --lift / --press / --btn-shadow 的 4px 是一组，改要一起改。
+ *   3. **hover 直接换调色板色**（Palette Swap）：青按钮 hover 变黄、红按钮 hover 变粉，
+ *      不是加深或透明，就是换一个 8-bit 色 —— 配合 0ms 过渡就是硬切。
+ *
+ * 按钮字用规范给的白字（红底 3.9:1 / 蓝底 2.5:1，低于 AA），和另外几套主题同样处理：
+ * 这是规范明确要求的 token。像素游戏里色块+白字本来就是标准做法，压深描边能补一点可读性。
+ */
+:root[data-theme='pixel'] {
+  /* 颜色：PICO-8 调色板，浅灰底 */
+  --bg: #f4f4f4;
+  --surface: #ffffff;
+  --surface-2: #e8e8e8;
+  --divider: #1a1c2c;
+  --text: #1a1c2c; /* 15.5:1 */
+  --text-dim: #5f574f; /* 6.4:1 */
+  --accent: #ff004d;
+  --accent-text: #ff004d;
+  --on-accent: #1a1c2c;
+  --danger: #ff004d;
+  --warning: #ffa300;
+  --success: #00e436;
+  --focus-ring: #29adff;
+
+  /* 形状：一个圆角都不许有 */
+  --radius-card: 0;
+  --radius-control: 0;
+  --radius-btn: 0;
+  --card-border: 4px solid #1a1c2c;
+  --card-shadow: 4px 4px 0 #1a1c2c;
+  --control-border: 4px solid #1a1c2c;
+
+  /* 排印：等宽 + 全大写 */
+  --font-ui: ui-monospace, 'Cascadia Mono', Consolas, 'Sarasa Mono SC', 'Microsoft YaHei', monospace;
+  --tt-heading: uppercase;
+  --tt-label: uppercase;
+  --ls-heading: 0.05em;
+  --ls-label: 0.1em;
+  --fw-heading: 700;
+  --brand-shadow: 3px 3px 0 #ff004d; /* 用硬边偏移代替发光 */
+  --grade-shadow: 4px 4px 0 #ff004d;
+
+  /* 动效：状态机，无过渡 */
+  --dur: 0ms;
+  --ease: linear;
+  /* 一律 4px —— 必须与 --btn-shadow 的偏移量相等，见上方说明 */
+  --lift: translate(4px, 4px);
+  --press: translate(4px, 4px);
+  --scanline: none;
+  --heading-transform: none;
+  --heading-origin: center;
+
+  --btn-shadow: 4px 4px 0 #1a1c2c;
+  --btn-shadow-hover: 2px 2px 0 #1a1c2c;
+  --btn-shadow-active: none;
+
+  /* 按钮：默认（次要）变体 —— hover 由青换黄 */
+  --btn-bg: #29adff;
+  --btn-fg: #ffffff;
+  --btn-border-c: #1a1c2c;
+  --btn-bg-hover: #ffec27;
+  --btn-fg-hover: #1a1c2c;
+  --btn-border-c-hover: #1a1c2c;
+
+  /* 按钮：主色变体 —— hover 由红换粉 */
+  --btn-primary-bg: #ff004d;
+  --btn-primary-fg: #ffffff;
+  --btn-primary-border-c: #1a1c2c;
+  --btn-primary-bg-hover: #ff77a8;
+  --btn-primary-fg-hover: #1a1c2c;
+  --btn-primary-border-c-hover: #1a1c2c;
+
+  /* 按钮：幽灵变体 */
+  --btn-ghost-bg: transparent;
+  --btn-ghost-fg: #1a1c2c;
+  --btn-ghost-border-c: #1a1c2c;
+  --btn-ghost-bg-hover: #e8e8e8;
+  --btn-ghost-fg-hover: #1a1c2c;
+  --btn-ghost-border-c-hover: #1a1c2c;
+
+  /* 分段控件 */
+  --seg-track-bg: #e8e8e8;
+  --seg-border: 4px solid #1a1c2c;
+  --seg-radius: 0;
+  --seg-fg: #1a1c2c;
+  --seg-fg-hover: #1a1c2c;
+  --seg-hover-bg: #ffec27;
+  --seg-active-bg: #ff004d;
+  --seg-active-fg: #ffffff;
+
+  /* 杂项 */
+  --overlay-scrim: rgba(244, 244, 244, 0.95);
+  --overlay-scrim-soft: rgba(244, 244, 244, 0.85);
+  --code-bg: #e8e8e8;
+  --code-border: 4px solid #1a1c2c;
+  --code-fg: #ff004d;
+  --input-border: 4px solid #1a1c2c;
+  --input-border-focus: 4px solid #1a1c2c;
+  --input-fg: #1a1c2c;
+  --input-caret: #ff004d;
+  --input-bg: #ffffff;
+  --placeholder-fg: #8b8680;
+  --input-focus-shadow: inset 0 0 0 2px #29adff; /* 内描边做焦点，不用现代 ring 辉光 */
+  /* 卡片内的信息块压到 2px：4px 会变成"卡片里套卡片"，2px 仍远粗于细边框 */
+  --note-bg: #ffffff;
+  --note-border: 2px solid #1a1c2c;
+  --note-shadow: 2px 2px 0 #1a1c2c;
+  --stat-bg: #ffffff;
+  --stat-border: 2px solid #1a1c2c;
+  --stat-shadow: 2px 2px 0 #1a1c2c;
+  --progress-bg: #e8e8e8;
+  --progress-fill: #ff004d;
+  --progress-shadow: 0 0 0 2px #1a1c2c; /* 外描边当像素框；.progress 用阴影描边而非 border，见文件头 */
+  --progress-radius: 0;
+  --progress-transition: width 0ms linear;
+  --badge-radius: 0;
+  --badge-border-w: 2px;
+  /* 亮色底 + 深色字：PICO-8 的霓虹绿/黄直接当文字色在浅底上只有 1.6:1，读不出来 */
+  --badge-good-bg: #00e436;
+  --badge-good-fg: #1a1c2c;
+  --badge-warn-bg: #ffec27;
+  --badge-warn-fg: #1a1c2c;
+  --badge-bad-bg: #ff004d;
+  --badge-bad-fg: #1a1c2c;
+  --disabled-opacity: 0.4;
+  --dot-radius: 0;
+  --btn-border-w: 4px;
+
+  --pick-active-bg: #ffec27;
+  --pick-active-fg: #1a1c2c;
+  --pick-active-border-c: #1a1c2c;
+
+  color-scheme: light;
+}
+
+/* ══════════════ 主题：水墨画风（Ink Wash） ══════════════
+ * 宣纸底 + 墨色字 + 苔绿/茶褐点缀，细边框、无阴影、大留白。
+ *
+ * 几处关键落实：
+ *
+ *   1. **按钮没有边框，只有一条底边线**。规范的水墨按钮是 `border-b`（单边），
+ *      而本项目的 button 是四边 border。没有为它改全局结构，而是把
+ *      --btn-border-w 置 1px + 颜色 transparent，再用 inset 阴影在底部画那条线：
+ *      `inset 0 -1px 0`。hover 加深、active 换内阴影，正好就是规范要的
+ *      "墨色渐深"与"落笔压纸"，且全程没有位移与缩放（--lift / --press 都是 none）。
+ *   2. **--fw-heading: 300**（font-light）。中文字体多数没有 300 字重，会回落到 400
+ *      渲染——这是字体本身的事，不是样式没生效。
+ *   3. **正文色比规范深**。规范的 `text-[#a89279]` 茶褐在宣纸上只有 2.7:1、
+ *      `text-[#c4b9a8]` 只有 1.9:1，两者都不能当正文。--text-dim 取同色相压暗
+ *      到 #7d6b56（4.7:1），茶褐的色感保留，可读性补回来。
+ *   4. 主按钮用 7% 墨色填充。规范里水墨按钮全是透明的下划线样式，若主按钮也透明，
+ *      它和次要按钮就完全一样了。"墨分五色"——主按钮是浓墨，其余是淡墨。
+ */
+:root[data-theme='ink'] {
+  /* 颜色：宣纸 + 墨 + 自然点缀 */
+  --bg: #f8f5f0;
+  --surface: #fdfbf7;
+  --surface-2: #f3efe8;
+  --divider: rgba(44, 44, 44, 0.2);
+  --text: #2c2c2c; /* 12.8:1 */
+  --text-dim: #7d6b56; /* 茶褐压暗，4.7:1；规范原值只有 2.7:1 */
+  --accent: #6b7b6e;
+  --accent-text: #55634f;
+  --on-accent: #f8f5f0;
+  --danger: #8c3a2e;
+  --warning: #7a5f28;
+  --success: #55634f;
+  --focus-ring: #6b7b6e;
+
+  /* 形状：直角，细边框，无阴影 */
+  --radius-card: 0;
+  --radius-control: 0;
+  --radius-btn: 0;
+  --card-border: 1px solid rgba(44, 44, 44, 0.2);
+  --card-shadow: none;
+  --control-border: 1px solid rgba(44, 44, 44, 0.2);
+
+  /* 排印：衬线呼应书法，轻字重，微字距 */
+  --font-ui: Georgia, 'Songti SC', 'STSong', 'SimSun', 'Microsoft YaHei', serif;
+  --tt-heading: none;
+  --tt-label: none;
+  --ls-heading: 0.05em;
+  --ls-label: 0.05em;
+  --fw-heading: 300;
+  --brand-shadow: none;
+  --grade-shadow: none;
+
+  /* 动效：缓慢晕染，无位移无弹性 */
+  --dur: 700ms;
+  --ease: ease-in-out;
+  --lift: none;
+  --press: none;
+  --scanline: none;
+  --heading-transform: none;
+  --heading-origin: center;
+
+  /* 用 inset 底边线代替 border-bottom，见文件上方说明 */
+  --btn-shadow: inset 0 -1px 0 rgba(44, 44, 44, 0.3);
+  --btn-shadow-hover: inset 0 -1px 0 rgba(44, 44, 44, 0.55);
+  --btn-shadow-active: inset 0 2px 6px rgba(44, 44, 44, 0.18);
+
+  /* 按钮：默认（次要）变体 */
+  --btn-bg: transparent;
+  --btn-fg: #2c2c2c;
+  --btn-border-c: transparent;
+  --btn-bg-hover: rgba(44, 44, 44, 0.04);
+  --btn-fg-hover: #2c2c2c;
+  --btn-border-c-hover: transparent;
+
+  /* 按钮：主色变体 —— 浓墨，与淡墨的次要按钮拉开 */
+  --btn-primary-bg: rgba(44, 44, 44, 0.07);
+  --btn-primary-fg: #2c2c2c;
+  --btn-primary-border-c: transparent;
+  --btn-primary-bg-hover: rgba(44, 44, 44, 0.13);
+  --btn-primary-fg-hover: #1f1f1f;
+  --btn-primary-border-c-hover: transparent;
+
+  /* 按钮：幽灵变体（button.ghost 会把阴影也清掉，只剩纯文字） */
+  --btn-ghost-bg: transparent;
+  --btn-ghost-fg: #7d6b56;
+  --btn-ghost-border-c: transparent;
+  --btn-ghost-bg-hover: rgba(44, 44, 44, 0.04);
+  --btn-ghost-fg-hover: #2c2c2c;
+  --btn-ghost-border-c-hover: transparent;
+
+  /* 分段控件 */
+  --seg-track-bg: transparent;
+  --seg-border: 1px solid rgba(44, 44, 44, 0.15);
+  --seg-radius: 0;
+  --seg-fg: #7d6b56;
+  --seg-fg-hover: #2c2c2c;
+  --seg-hover-bg: rgba(44, 44, 44, 0.05);
+  --seg-active-bg: rgba(107, 123, 110, 0.16);
+  --seg-active-fg: #4a5749;
+
+  /* 杂项 */
+  --overlay-scrim: rgba(248, 245, 240, 0.95);
+  --overlay-scrim-soft: rgba(248, 245, 240, 0.85);
+  --code-bg: rgba(44, 44, 44, 0.05);
+  --code-border: 1px solid rgba(44, 44, 44, 0.12);
+  --code-fg: #55634f;
+  --input-border: 1px solid rgba(44, 44, 44, 0.2);
+  --input-border-focus: 1px solid rgba(44, 44, 44, 0.45);
+  --input-fg: #2c2c2c;
+  --input-caret: #6b7b6e;
+  --input-bg: transparent;
+  --placeholder-fg: rgba(44, 44, 44, 0.4);
+  --input-focus-shadow: inset 0 1px 3px rgba(44, 44, 44, 0.05);
+  --note-bg: rgba(107, 123, 110, 0.07);
+  --note-border: 1px solid rgba(107, 123, 110, 0.2);
+  --note-shadow: none;
+  --stat-bg: transparent;
+  --stat-border: 1px solid rgba(44, 44, 44, 0.12);
+  --stat-shadow: none;
+  --progress-bg: rgba(44, 44, 44, 0.08);
+  --progress-fill: #6b7b6e;
+  --progress-shadow: none;
+  --progress-radius: 0;
+  --progress-transition: width 700ms ease-in-out;
+  --badge-radius: 0;
+  --badge-border-w: 1px;
+  --badge-good-bg: rgba(107, 123, 110, 0.14);
+  --badge-good-fg: #55634f;
+  --badge-warn-bg: rgba(168, 146, 121, 0.18);
+  --badge-warn-fg: #7a5f28;
+  --badge-bad-bg: rgba(140, 58, 46, 0.12);
+  --badge-bad-fg: #8c3a2e;
+  --disabled-opacity: 0.35;
+  --dot-radius: 0;
+  --btn-border-w: 1px;
+
+  --pick-active-bg: rgba(107, 123, 110, 0.14);
+  --pick-active-fg: #4a5749;
+  --pick-active-border-c: #6b7b6e;
+
+  color-scheme: light;
+}
+
+/* ══════════════ 基础重置 ══════════════ */
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  /* 防止移动端点击时出现灰色高亮块 */
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  /* iPhone 刘海/底部横条避让 */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
+}
+
+/* ══════════════ 首次进入：品牌加载器 ══════════════
+ * 不新增主题变量：底色取 --text、前景取 --bg、细节取 --accent，
+ * 因此六套主题都能直接得到一致且成对的对比度。
+ */
+.entry-loader {
+  --pointer-x: 0px;
+  --pointer-y: 0px;
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  overflow: hidden;
+  /* 默认主题的 --bg 是纯色，可以直接放在 --text 帘幕上。
+     粘土/霓虹的 --bg 是渐变，下面单独回退到纯色 --on-accent。 */
+  --entry-loader-fg: var(--bg);
+  color: var(--entry-loader-fg);
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  isolation: isolate;
+}
+
+:root[data-theme='clay'] .entry-loader,
+:root[data-theme='vapor'] .entry-loader {
+  --entry-loader-fg: var(--on-accent);
+}
+
+.entry-loader__curtains,
+.entry-loader__content {
+  position: absolute;
+  inset: 0;
+}
+
+.entry-loader__curtains {
+  z-index: 0;
+}
+
+.entry-loader__curtains span {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  left: calc(var(--i) * (100% / 6));
+  width: calc(100% / 6 + 1px);
+  background: var(--text);
+  transition: transform 420ms cubic-bezier(0.76, 0, 0.24, 1);
+  transition-delay: calc(var(--i) * 20ms);
+  will-change: transform;
+}
+
+.entry-loader__curtains span::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--accent);
+  opacity: 0.38;
+}
+
+.entry-loader.is-leaving .entry-loader__curtains span {
+  transform: translateY(var(--exit-y));
+}
+
+.entry-loader__content {
+  z-index: 1;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  padding: max(22px, env(safe-area-inset-top)) max(22px, env(safe-area-inset-right))
+    max(24px, env(safe-area-inset-bottom)) max(22px, env(safe-area-inset-left));
+  transition: opacity 260ms ease, transform 320ms cubic-bezier(0.76, 0, 0.24, 1);
+}
+
+.entry-loader.is-leaving .entry-loader__content {
+  opacity: 0;
+  transform: translateY(-18px);
+}
+
+.entry-loader__meta,
+.entry-loader__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.entry-loader__meta {
+  opacity: 0.68;
+}
+
+.entry-loader__center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  transform: translate3d(var(--pointer-x), var(--pointer-y), 0);
+  transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
+}
+
+.entry-loader__eq {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(3px, 0.8vw, 7px);
+  height: clamp(34px, 8vh, 76px);
+  margin-bottom: clamp(20px, 5vh, 50px);
+}
+
+.entry-loader__eq i {
+  display: block;
+  width: clamp(2px, 0.45vw, 4px);
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+  transform: scaleY(0.16);
+  transform-origin: center;
+  animation: entry-eq 820ms var(--ease) infinite alternate;
+  animation-delay: calc(var(--i) * -58ms);
+}
+
+.entry-loader__title {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-family: var(--font-ui);
+  font-size: clamp(48px, 13.5vw, 176px);
+  font-weight: var(--fw-heading);
+  line-height: 0.78;
+  letter-spacing: 0;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.entry-loader__title span:last-child {
+  color: var(--accent);
+}
+
+.entry-loader__footer {
+  align-items: flex-end;
+}
+
+.entry-loader__count {
+  font-size: clamp(28px, 6vw, 58px);
+  line-height: 0.82;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+
+.entry-loader__progress {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 2;
+  height: 4px;
+  background: color-mix(in srgb, var(--entry-loader-fg) 18%, transparent);
+}
+
+.entry-loader__progress i {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 90ms linear;
+}
+
+@keyframes entry-eq {
+  0% {
+    transform: scaleY(0.16);
+  }
+  48% {
+    transform: scaleY(0.62);
+  }
+  100% {
+    transform: scaleY(1);
+  }
+}
+
+/* ══════════════ 页面切换：分栏帘幕 ══════════════ */
+.screen-transition {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  overflow: hidden;
+  pointer-events: auto;
+  isolation: isolate;
+}
+
+.screen-transition__curtains,
+.screen-transition__prompt,
+.screen-transition__label {
+  position: absolute;
+  inset: 0;
+}
+
+.screen-transition__curtains {
+  z-index: 0;
+}
+
+.screen-transition__curtains span {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  left: calc(var(--i) * (100% / 6));
+  width: calc(100% / 6 + 1px);
+  background: var(--text);
+  transform: translateY(105%);
+  will-change: transform;
+}
+
+.screen-transition.is-cover .screen-transition__curtains span {
+  animation: curtain-cover 780ms cubic-bezier(0.76, 0, 0.24, 1) both;
+  animation-delay: calc(var(--i) * 45ms);
+}
+
+.screen-transition.is-reveal .screen-transition__curtains span {
+  animation: curtain-reveal 820ms cubic-bezier(0.76, 0, 0.24, 1) both;
+  animation-delay: calc(var(--i) * 45ms);
+}
+
+.screen-transition__prompt {
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--accent-text);
+  opacity: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.screen-transition__prompt i {
+  display: block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--accent);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: transition-spin 720ms linear infinite;
+}
+
+.screen-transition__prompt span {
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.screen-transition.is-prepare .screen-transition__prompt {
+  animation: transition-prompt-in 360ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.screen-transition.is-cover .screen-transition__prompt,
+.screen-transition.is-reveal .screen-transition__prompt {
+  display: none;
+}
+
+.screen-transition__label {
+  z-index: 1;
+  --transition-fg: var(--bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 24px;
+  color: var(--transition-fg);
+  text-align: center;
+}
+
+:root[data-theme='clay'] .screen-transition__label,
+:root[data-theme='vapor'] .screen-transition__label {
+  --transition-fg: var(--on-accent);
+}
+
+.screen-transition__label span {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.screen-transition__label strong {
+  font-size: clamp(38px, 10vw, 112px);
+  font-weight: var(--fw-heading);
+  line-height: 0.92;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.screen-transition.is-cover .screen-transition__label {
+  animation: transition-label-in 620ms cubic-bezier(0.16, 1, 0.3, 1) 220ms both;
+}
+
+.screen-transition.is-reveal .screen-transition__label {
+  animation: transition-label-out 620ms ease both;
+}
+
+@keyframes curtain-cover {
+  from {
+    transform: translateY(105%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes curtain-reveal {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-105%);
+  }
+}
+
+@keyframes transition-label-in {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes transition-prompt-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes transition-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes transition-label-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-18px);
+  }
+}
+
+.screen {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 20px;
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* 扫描线叠加（赛博主题专有，QQ 主题下 --scanline 为 none）。
+ * 挂在 .screen 上而非 .app，游戏页（.game-host）因此天然不受影响，
+ * 下落音符的可读性不会被干扰。pointer-events:none 保证不吞掉任何点击。 */
+.screen::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 30;
+  background: var(--scanline);
+}
+
+/* ══════════════ 排版 ══════════════ */
+h1 {
+  font-size: clamp(26px, 6vw, 34px);
+  margin: 0;
+  font-weight: var(--fw-heading);
+  text-transform: var(--tt-heading);
+  letter-spacing: var(--ls-heading);
+  transform: var(--heading-transform);
+  transform-origin: var(--heading-origin);
+}
+
+h2 {
+  font-size: 17px;
+  margin: 0 0 8px;
+  font-weight: var(--fw-heading);
+  text-transform: var(--tt-label);
+  letter-spacing: var(--ls-label);
+}
+
+p {
+  line-height: 1.65;
+  color: var(--text-dim);
+  margin: 0;
+  font-size: 14px;
+}
+
+code {
+  font-family: var(--font-ui);
+  background: var(--code-bg);
+  border: var(--code-border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  color: var(--code-fg);
+}
+
+.muted {
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.brand {
+  font-size: clamp(30px, 9vw, 46px);
+  font-weight: var(--fw-heading);
+  text-transform: var(--tt-heading);
+  letter-spacing: var(--ls-heading);
+  color: var(--accent-text);
+  text-shadow: var(--brand-shadow);
+}
+
+/* ══════════════ 卡片 ══════════════ */
+.card {
+  background: var(--surface);
+  border: var(--card-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--card-shadow);
+  padding: 16px;
+}
+
+/* ══════════════ 按钮 ══════════════
+ * 状态规则只声明属性，取值全部来自变量；变体类只赋变量。
+ */
+button {
+  font: inherit;
+  font-family: var(--font-ui);
+  font-weight: 700;
+  text-transform: var(--tt-label);
+  letter-spacing: var(--ls-label);
+  color: var(--btn-fg);
+  background: var(--btn-bg);
+  /* 宽度也走变量：像素风要 border-4、水墨要 0（它只用一条底边线，见各自的主题块） */
+  border: var(--btn-border-w) solid var(--btn-border-c);
+  border-radius: var(--radius-btn);
+  box-shadow: var(--btn-shadow);
+  padding: 12px 18px;
+  cursor: pointer;
+  transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease),
+    background-color var(--dur) var(--ease), color var(--dur) var(--ease),
+    border-color var(--dur) var(--ease);
+  /* 手机上按钮至少 44px 高，符合触摸目标尺寸 */
+  min-height: 44px;
+}
+
+button:hover:not(:disabled) {
+  background: var(--btn-bg-hover);
+  color: var(--btn-fg-hover);
+  border-color: var(--btn-border-c-hover);
+  transform: var(--lift);
+  box-shadow: var(--btn-shadow-hover);
+}
+
+button:active:not(:disabled) {
+  transform: var(--press);
+  box-shadow: var(--btn-shadow-active);
+}
+
+button:disabled {
+  opacity: var(--disabled-opacity);
+  cursor: not-allowed;
+}
+
+button.primary {
+  --btn-bg: var(--btn-primary-bg);
+  --btn-fg: var(--btn-primary-fg);
+  --btn-border-c: var(--btn-primary-border-c);
+  --btn-bg-hover: var(--btn-primary-bg-hover);
+  --btn-fg-hover: var(--btn-primary-fg-hover);
+  --btn-border-c-hover: var(--btn-primary-border-c-hover);
+}
+
+button.ghost {
+  --btn-bg: var(--btn-ghost-bg);
+  --btn-fg: var(--btn-ghost-fg);
+  --btn-border-c: var(--btn-ghost-border-c);
+  --btn-bg-hover: var(--btn-ghost-bg-hover);
+  --btn-fg-hover: var(--btn-ghost-fg-hover);
+  --btn-border-c-hover: var(--btn-ghost-border-c-hover);
+  --btn-shadow: none;
+  --btn-shadow-hover: none;
+  --btn-shadow-active: none;
+}
+
+:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.row.tight {
+  gap: 8px;
+}
+
+/* ══════════════ 分段控件 ══════════════
+ * 不写 .seg button:hover —— 变量赋值已足够覆盖，见文件头说明。
+ */
+.seg {
+  display: flex;
+  background: var(--seg-track-bg);
+  border: var(--seg-border);
+  border-radius: var(--seg-radius);
+  overflow: hidden;
+}
+
+.seg button {
+  --btn-bg: transparent;
+  --btn-fg: var(--seg-fg);
+  --btn-border-c: transparent;
+  --btn-border-c-hover: transparent;
+  --btn-bg-hover: var(--seg-hover-bg);
+  --btn-fg-hover: var(--seg-fg-hover);
+  --btn-shadow: none;
+  --btn-shadow-hover: none;
+  --btn-shadow-active: none;
+  /* 分段控件内不做位移/倾斜，否则会破格 */
+  --lift: none;
+  --press: none;
+  flex: 1;
+  border: none;
+  border-radius: 0;
+  padding: 11px 8px;
+}
+
+.seg button[data-active='true'] {
+  --btn-bg: var(--seg-active-bg);
+  --btn-fg: var(--seg-active-fg);
+  --btn-bg-hover: var(--seg-active-bg);
+  --btn-fg-hover: var(--seg-active-fg);
+}
+
+/* ══════════════ 主题选择器 ══════════════
+ * 一个触发按钮 + 展开的选项面板。
+ *
+ * 早先这里是 .seg 分段控件横排一排：两个主题刚好装下，加到第三个就开始挤——
+ * 既放不下色卡，也放不下那句说明，而且每加一套主题就得重新算计宽度。
+ * 改成"按钮 → 展开"后，加主题只是往 THEMES 里加一项，这里一行都不用动：
+ * 面板是 auto-fit 网格，多出来的选项自己换行。
+ *
+ * 面板走**文档流内展开**而非绝对定位浮层：.screen 是 overflow-y:auto 的滚动容器，
+ * 浮层会被它裁掉（卡片挨着页尾时菜单直接消失），手机上也容易顶出视口。
+ * 内展开把下方内容推开，代价只是页面变长，没有裁切和定位的坑。
+ */
+.home-theme {
+  position: fixed;
+  top: max(18px, env(safe-area-inset-top));
+  right: max(20px, env(safe-area-inset-right));
+  z-index: 60;
+}
+
+.theme-picker--compact {
+  width: auto;
+}
+
+.theme-picker--compact .theme-trigger {
+  width: auto;
+  min-width: 154px;
+  min-height: 40px;
+  padding: 9px 12px;
+}
+
+.theme-picker--compact .theme-name {
+  flex: 0 1 auto;
+}
+
+/* Home 的浮层脱离 .screen 的滚动裁剪，始终锚定在右上角。
+ * 高度受视口限制，主题多时面板内部自己滚动。 */
+.theme-picker--compact .theme-menu {
+  position: fixed;
+  top: calc(max(18px, env(safe-area-inset-top)) + 56px);
+  right: max(20px, env(safe-area-inset-right));
+  width: min(380px, calc(100vw - 32px));
+  max-height: min(70vh, calc(100vh - 110px));
+  overflow-y: auto;
+  grid-template-columns: 1fr;
+  padding: 8px;
+  background: var(--surface);
+  border: var(--card-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--card-shadow);
+}
+
+.theme-trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+}
+
+.theme-trigger .theme-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.theme-caret {
+  flex: none;
+  transition: transform var(--dur) var(--ease);
+}
+
+.theme-trigger[aria-expanded='true'] .theme-caret {
+  transform: rotate(180deg);
+}
+
+.theme-menu {
+  /* 两列。三个主题时曾是单列（那时多列的账是"2+1 落单占半行"），
+   * 到六套主题单列要吃掉半个屏幕，反过来不划算了。
+   * 280px 起：660px 的卡片放两列，每列 325px 装得下"主题名 + 一整句说明"；
+   * 手机（卡片内宽约 300px）自然落成一列。
+   * 主题数是奇数时末项会落单占半行——那是这两者里较轻的代价。 */
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+  animation: theme-menu-in var(--dur) var(--ease);
+}
+
+@keyframes theme-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 选项：外观是卡片（surface + 卡片圆角），但元素是 button。
+ * 因此照旧只赋 --btn-* 变量、不写 .theme-option:hover —— 见文件头说明。 */
+.theme-option {
+  --btn-bg: var(--surface);
+  --btn-bg-hover: var(--surface); /* hover 只上浮，不改底色，免得渐变跳一下 */
+  --btn-fg: var(--text);
+  --btn-fg-hover: var(--text);
+  /* 选项底色与卡片同源（都是 --surface），不给边框的话粘土主题下两者直接糊在一起
+   * ——那边的 --card-border 是透明的。用 --divider，三套主题各自有值。 */
+  --btn-border-c: var(--divider);
+  --btn-border-c-hover: var(--divider);
+  --btn-shadow: var(--card-shadow);
+  --btn-shadow-hover: var(--card-shadow);
+  --btn-shadow-active: var(--card-shadow);
+  --lift: translateY(-2px);
+  --press: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  padding: 12px 14px;
+  /* 选项里是正常大小写的产品名，不是分段控件那种标签 */
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* 选中态：淡色底 + 深色字 + 描边。三套主题各自给值，这里不写死任何颜色。
+ * 边框从 transparent 变实色而宽度不变（都是 2px），所以选中时不会把内容挤歪。 */
+.theme-option[aria-selected='true'] {
+  --btn-bg: var(--pick-active-bg);
+  --btn-bg-hover: var(--pick-active-bg);
+  --btn-fg: var(--pick-active-fg);
+  --btn-fg-hover: var(--pick-active-fg);
+  --btn-border-c: var(--pick-active-border-c);
+  --btn-border-c-hover: var(--pick-active-border-c);
+}
+
+.theme-option .theme-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.theme-option .theme-label {
+  font-weight: 700;
+}
+
+.theme-option .theme-desc {
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.45;
+  color: inherit;
+  /* 未选中时降一档做层级（对 --text-dim 约 4.7:1，仍过 AA）；
+   * 选中态不再降 —— 底色已经是淡彩，再叠透明度就滑到 3:1 以下。 */
+  opacity: 0.75;
+}
+
+.theme-option[aria-selected='true'] .theme-desc {
+  opacity: 1;
+}
+
+.theme-check {
+  flex: none;
+  /* 用 visibility 而非 opacity：勾选标记不能只是"看不太清"，它得真的不在 */
+  visibility: hidden;
+}
+
+.theme-option[aria-selected='true'] .theme-check {
+  visibility: visible;
+}
+
+/* 色卡圆点。浅色主题的白色块在浅底上会消失，所以垫一圈内描边兜底。 */
+.theme-dots {
+  display: inline-flex;
+  flex: none;
+  gap: 3px;
+}
+
+.theme-dots i {
+  display: block;
+  width: 14px;
+  height: 14px;
+  /* 走变量：像素风禁止任何圆角，色卡也得是方块 */
+  border-radius: var(--dot-radius);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.16);
+}
+
+/* ══════════════ 进度条 ══════════════
+ * 用 box-shadow 外描边而非 border：border 会占掉内容高度，而游戏页那条
+ * 对手进度条传了内联 height:4，在 border-box 下会被边框吃光、永远显示成满进度。
+ */
+.progress {
+  height: 8px;
+  background: var(--progress-bg);
+  border-radius: var(--progress-radius);
+  box-shadow: var(--progress-shadow);
+  overflow: hidden;
+}
+
+.progress > div {
+  height: 100%;
+  background: var(--progress-fill);
+  transition: var(--progress-transition);
+}
+
+/* 游戏画布：touch-action:none 是必须的，否则多点触摸会触发页面滚动/缩放 */
+.game-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.game-host {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ══════════════ 鼓点光晕 ══════════════
+ * 跟着鼓点序列脉冲，见 core/engine.ts 的 advanceDrums。
+ *
+ * 颜色**不在主题块里逐套写死**，而是取 --accent —— 六个主题各自都定义了这个
+ * 变量，所以加主题时这里不用动，天然就是"和当前主题色匹配"。
+ *
+ * 脉冲只靠 opacity 一个属性：引擎每帧写它，而 opacity 在现代浏览器里是纯合成
+ * 操作（元素已被 will-change 提升到独立层）。若改成每帧写 box-shadow，就会
+ * 每帧触发一次全屏重绘，正是这个功能最不该有的开销。 */
+.drum-glow {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  opacity: 0;
+  will-change: opacity;
+  /* 用 color-mix 把主题色压到半透明。直接拿 --accent 原色画会很"实"，
+     白底主题上尤其像沿边贴了一圈胶带。
+     58% 是实测的平衡点：40% 时上下边缘几乎看不出来，再往上加，白底主题的
+     整块可玩区域就会被染绿、吃掉音符与轨道的对比度——那才是"影响到操作"。 */
+  --drum-glow-c: color-mix(in srgb, var(--accent) 58%, transparent);
+  /* 两层各司其职：内层短半径勾出贴边的一圈轮廓（用户要的"边框一圈"），
+     外层长半径柔和晕开。半径决定光晕能往画面里爬多深——84px 下中间的
+     连击/音符区仍然是干净的，所以这是"更大"而不是"更糊"。 */
+  box-shadow:
+    inset 0 0 20px var(--drum-glow-c),
+    inset 0 0 84px var(--drum-glow-c);
+}
+
+/* ══════════════ 统计与徽标 ══════════════ */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 10px;
+}
+
+.stat {
+  background: var(--stat-bg);
+  border: var(--stat-border);
+  border-radius: var(--radius-control);
+  box-shadow: var(--stat-shadow);
+  padding: 10px 12px;
+}
+
+.stat .k {
+  font-size: 12px;
+  color: var(--text-dim);
+  text-transform: var(--tt-label);
+  letter-spacing: var(--ls-label);
+}
+
+.stat .v {
+  font-size: 20px;
+  font-weight: var(--fw-heading);
+  color: var(--accent-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.badge {
+  display: inline-block;
+  font-size: 12px;
+  padding: 3px 9px;
+  border-radius: var(--badge-radius);
+  border: var(--badge-border-w) solid var(--badge-border-c);
+  background: var(--badge-bg);
+  color: var(--badge-fg);
+  text-transform: var(--tt-label);
+  letter-spacing: var(--ls-label);
+  font-weight: 700;
+}
+
+.badge.good {
+  --badge-bg: var(--badge-good-bg);
+  --badge-fg: var(--badge-good-fg);
+  --badge-border-c: var(--badge-good-bg);
+}
+
+.badge.warn {
+  --badge-bg: var(--badge-warn-bg);
+  --badge-fg: var(--badge-warn-fg);
+  --badge-border-c: var(--badge-warn-bg);
+}
+
+.badge.bad {
+  --badge-bg: var(--badge-bad-bg);
+  --badge-fg: var(--badge-bad-fg);
+  --badge-border-c: var(--badge-bad-bg);
+}
+
+.note {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-dim);
+  border: var(--note-border);
+  border-radius: var(--radius-control);
+  background: var(--note-bg);
+  box-shadow: var(--note-shadow);
+  padding: 8px 10px;
+}
+
+.grade {
+  font-size: 68px;
+  font-weight: var(--fw-heading);
+  line-height: 1;
+  color: var(--accent-text);
+  text-shadow: var(--grade-shadow);
+}
+
+/* ══════════════ 输入框 ══════════════ */
+.input {
+  font-family: var(--font-ui);
+  font-size: 16px;
+  border: var(--input-border);
+  border-radius: var(--radius-control);
+  background: var(--input-bg);
+  color: var(--input-fg);
+  caret-color: var(--input-caret);
+  padding: 0 14px;
+  min-height: 44px;
+}
+
+.input::placeholder {
+  color: var(--placeholder-fg);
+  text-transform: var(--tt-label);
+  letter-spacing: var(--ls-label);
+}
+
+.input:focus {
+  outline: none;
+  border: var(--input-border-focus);
+  box-shadow: var(--input-focus-shadow);
+}
+
+/* 键盘 Tab 进来时仍要有清晰的焦点环（鼠标点击不需要） */
+.input:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+input[type='range'] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+/* ══════════════ 遮罩 ══════════════
+ * 倒计时数字的颜色继承自 body 的 --text，所以遮罩必须跟着主题走：
+ * QQ 主题下 --text 是深色，配深色遮罩会让倒计时直接消失。
+ */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--overlay-scrim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
+  z-index: 50;
+}
+
+/* ══════════════ 动效降级出口 ══════════════ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+
+  button:hover:not(:disabled),
+  button:active:not(:disabled) {
+    transform: none;
+  }
+
+  h1 {
+    transform: none;
+  }
+
+  /* 加载与页面切换仍保留“状态变化”，但改为更短的纯淡出/位移，
+   * 不做持续循环或大幅错峰，避免直接瞬跳让用户失去上下文。 */
+  .entry-loader {
+    transition: opacity 520ms ease !important;
+  }
+
+  .entry-loader.is-leaving {
+    opacity: 0;
+  }
+
+  .entry-loader__curtains span {
+    transition-duration: 520ms !important;
+    transition-delay: 0ms !important;
+  }
+
+  .entry-loader__content {
+    transition-duration: 180ms !important;
+  }
+
+  .entry-loader__eq i {
+    animation: none !important;
+    transform: scaleY(0.58);
+  }
+
+  .screen-transition.is-prepare .screen-transition__prompt {
+    animation-duration: 120ms !important;
+  }
+
+  .screen-transition__prompt i {
+    animation: none !important;
+    border-top-color: var(--accent);
+  }
+
+  .screen-transition.is-cover .screen-transition__curtains span {
+    animation-duration: 360ms !important;
+    animation-delay: 0ms !important;
+  }
+
+  .screen-transition.is-reveal .screen-transition__curtains span {
+    animation-duration: 400ms !important;
+    animation-delay: 0ms !important;
+  }
+
+  .screen-transition.is-cover .screen-transition__label {
+    animation-duration: 240ms !important;
+    animation-delay: 0ms !important;
+  }
+
+  .screen-transition.is-reveal .screen-transition__label {
+    animation-duration: 200ms !important;
+  }
+}
