@@ -224,11 +224,29 @@ async function main() {
     host.waitFor((m) => m.t === 'FINAL_RESULT', '房主结算'),
     guest.waitFor((m) => m.t === 'FINAL_RESULT', '对手结算'),
   ])
-  host.send({ t: 'FINISH', score: 9000, accuracy: 0.9, maxCombo: 40 })
-  guest.send({ t: 'FINISH', score: 12345, accuracy: 0.95, maxCombo: 50 })
+  host.send({
+    t: 'FINISH',
+    score: 9000,
+    accuracy: 0.9,
+    maxCombo: 40,
+    counts: { perfect: 80, great: 10, good: 5, miss: 5 },
+  })
+  guest.send({
+    t: 'FINISH',
+    score: 12345,
+    accuracy: 0.95,
+    maxCombo: 50,
+    counts: { perfect: 90, great: 5, good: 3, miss: 2 },
+  })
   const [final] = await finalPromise
 
   check('结算生成且排序正确', final.players[0].score === 12345)
+  check(
+    '双方结算包含等级和各判定数量',
+    final.players[0].grade === 'P' &&
+      final.players[0].counts.perfect === 90 &&
+      final.players[1].counts.miss === 5,
+  )
   check('胜者判定正确', final.winnerId === joined.playerId, `winner=${final.winnerId}`)
 
   // ── 断线通知 ──

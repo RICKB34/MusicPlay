@@ -32,6 +32,24 @@ const MAX_AUDIO_BYTES = 30 * 1024 * 1024
 /** 房间空闲多久后回收（毫秒）。 */
 const ROOM_TTL_MS = 30 * 60 * 1000
 
+function gradeOf(score) {
+  if (score >= 10000) return 'P'
+  if (score >= 9000) return 'S'
+  if (score >= 8000) return 'A'
+  if (score >= 7000) return 'B'
+  if (score >= 6000) return 'C'
+  return 'D'
+}
+
+function normalizeCounts(counts) {
+  return {
+    perfect: Number(counts?.perfect ?? 0),
+    great: Number(counts?.great ?? 0),
+    good: Number(counts?.good ?? 0),
+    miss: Number(counts?.miss ?? 0),
+  }
+}
+
 /** @type {Map<string, Room>} */
 const rooms = new Map()
 
@@ -211,6 +229,9 @@ class Room {
       score: r.score,
       accuracy: r.accuracy,
       maxCombo: r.maxCombo,
+      grade: gradeOf(r.score),
+      counts: normalizeCounts(r.counts),
+      totalNotes: this.chart?.notes?.length ?? 0,
     }))
     players.sort((a, b) => b.score - a.score || b.accuracy - a.accuracy)
 
@@ -458,6 +479,7 @@ wss.on('connection', (ws) => {
           score: msg.score,
           accuracy: msg.accuracy,
           maxCombo: msg.maxCombo,
+          counts: normalizeCounts(msg.counts),
         })
         room.broadcast(
           {

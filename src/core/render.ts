@@ -627,11 +627,12 @@ export class CanvasRenderer {
     ctx.textAlign = 'left'
     ctx.fillStyle = this.theme.textPrimary
     ctx.font = `600 26px ${this.theme.fontFamily}`
-    ctx.fillText(String(state.score).padStart(5, '0'), 16, 38)
+    // 对战页顶部中央有对手分数与进度条；自己的 HUD 下移，避免窄屏互相遮挡。
+    ctx.fillText(String(state.score).padStart(5, '0'), 16, 62)
 
     ctx.font = `400 13px ${this.theme.fontFamily}`
     ctx.fillStyle = this.theme.textDim
-    ctx.fillText(`${(state.accuracy * 100).toFixed(2)}%`, 16, 58)
+    ctx.fillText(`${(state.accuracy * 100).toFixed(2)}%`, 16, 82)
 
     // 连击：只在 2 以上显示，避免干扰
     if (state.combo >= 2) {

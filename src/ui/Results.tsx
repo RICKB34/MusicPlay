@@ -12,6 +12,7 @@ import type { Chart, Difficulty, TrackAnalysis } from '../types'
 import type { GameResult } from '../core/engine'
 import type { LaneQualityReport } from '../chartgen/lanes'
 import { chartStats } from '../chartgen/serialize'
+import type { BattlePlayerResult } from '../net/protocol'
 
 interface Props {
   result: GameResult
@@ -19,6 +20,9 @@ interface Props {
   analysis: TrackAnalysis | null
   quality: LaneQualityReport | null
   isBattle: boolean
+  battleFinal: BattlePlayerResult[] | null
+  battleWinnerId: string | null
+  battlePlayerId: string | null
   onRetry: () => void
   onBack: () => void
   onDifficulty: (d: Difficulty) => void
@@ -30,40 +34,109 @@ const DIFFICULTY_LABELS: Record<Difficulty, string> = {
   hard: '困难',
 }
 
-export function Results({
-  result,
-  chart,
-  analysis,
-  quality,
-  isBattle,
-  onRetry,
-  onBack,
-  onDifficulty,
-}: Props) {
-  const stats = chart ? chartStats(chart) : null
-  const diag = analysis?.diagnostics ?? null
+const JUDGMENTS = ['perfect', 'great', 'good', 'miss'] as const
 
+function BattleResultCard({
+  result,
+  label,
+  winnerId,
+}: {
+  result: BattlePlayerResult
+  label: string
+  winnerId: string | null
+}) {
+  const outcome = winnerId === null ? '平局' : result.playerId === winnerId ? '胜' : '负'
   return (
-    <div className="screen">
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}>
+    <div className="card battle-result">
+      <div className="battle-result__head">
+        <strong>{label}</strong>
+        <span className={`badge ${outcome === '胜' ? 'good' : outcome === '负' ? 'bad' : 'warn'}`}>
+          {outcome}
+        </span>
+      </div>
+      <div className="battle-result__score">
         <div className="grade">{result.grade}</div>
         <div>
-          <h1 style={{ fontSize: 20 }}>{result.score.toLocaleString()}</h1>
+          <div className="battle-result__points">{result.score.toLocaleString()}</div>
           <p className="muted">
             准确率 {(result.accuracy * 100).toFixed(2)}% · 最大连击 {result.maxCombo}
-            {isBattle && ' · 对战'}
           </p>
         </div>
       </div>
-
-      <div className="stat-grid">
-        {(['perfect', 'great', 'good', 'miss'] as const).map((k) => (
+      <div className="stat-grid battle-result__counts">
+        {JUDGMENTS.map((k) => (
           <div className="stat" key={k}>
             <div className="k">{k.toUpperCase()}</div>
             <div className="v">{result.counts[k]}</div>
           </div>
         ))}
       </div>
+    </div>
+  )
+}
+
+export function Results({
+  result,
+  chart,
+  analysis,
+  quality,
+  isBattle,
+  battleFinal,
+  battleWinnerId,
+  battlePlayerId,
+  onRetry,
+  onBack,
+  onDifficulty,
+}: Props) {
+  const stats = chart ? chartStats(chart) : null
+  const diag = analysis?.diagnostics ?? null
+  const localFinal = battleFinal?.find((p) => p.playerId === battlePlayerId) ?? null
+  const opponentFinal = battleFinal?.find((p) => p.playerId !== battlePlayerId) ?? null
+  const orderedFinal =
+    localFinal && opponentFinal
+      ? [localFinal, opponentFinal]
+      : (battleFinal ?? [])
+
+  return (
+    <div className="screen">
+      {isBattle && battleFinal ? (
+        <div className="battle-results">
+          {orderedFinal.map((player, index) => (
+            <BattleResultCard
+              key={player.playerId}
+              result={player}
+              label={player.playerId === battlePlayerId ? '你' : index === 0 ? '对手' : player.playerId}
+              winnerId={battleWinnerId}
+            />
+          ))}
+        </div>
+      ) : (
+        <>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}>
+            <div className="grade">{result.grade}</div>
+            <div>
+              <h1 style={{ fontSize: 20 }}>{result.score.toLocaleString()}</h1>
+              <p className="muted">
+                准确率 {(result.accuracy * 100).toFixed(2)}% · 最大连击 {result.maxCombo}
+                {isBattle && ' · 对战'}
+              </p>
+            </div>
+          </div>
+
+          <div className="stat-grid">
+            {JUDGMENTS.map((k) => (
+              <div className="stat" key={k}>
+                <div className="k">{k.toUpperCase()}</div>
+                <div className="v">{result.counts[k]}</div>
+              </div>
+            ))}
+          </div>
+
+          {isBattle && (
+            <p className="muted">正在等待对手完成并汇总双方成绩…</p>
+          )}
+        </>
+      )}
 
       {isBattle && (
         <div className="card">

@@ -8,10 +8,15 @@
  * 之后每 10 秒补一次以跟踪网络变化。
  */
 
-import type { Chart, ScoreSnapshot } from '../types'
+import type { Chart, Judgment, ScoreSnapshot } from '../types'
 import { deserializeChart } from '../chartgen/serialize'
 import { ClockSync, localNowMs } from './sync'
-import { MAX_BATTLE_AUDIO_BYTES, type ClientMessage, type ServerMessage } from './protocol'
+import {
+  MAX_BATTLE_AUDIO_BYTES,
+  type BattlePlayerResult,
+  type ClientMessage,
+  type ServerMessage,
+} from './protocol'
 
 export type ConnectionState =
   | 'idle'
@@ -41,10 +46,7 @@ export interface BattleCallbacks {
   onCountdown?: (startAtServerMs: number, leadMs: number) => void
   onOpponentScore?: (snapshot: ScoreSnapshot) => void
   onOpponentFinished?: (score: number, accuracy: number, maxCombo: number) => void
-  onFinal?: (
-    players: { playerId: string; score: number; accuracy: number; maxCombo: number }[],
-    winnerId: string | null,
-  ) => void
+  onFinal?: (players: BattlePlayerResult[], winnerId: string | null) => void
   onError?: (message: string) => void
   /** 时钟同步完成（样本足够）。 */
   onSynced?: (rttMs: number) => void
@@ -264,6 +266,10 @@ export class BattleClient {
       cb.onOpponentFinished?.(msg.score, msg.accuracy, msg.maxCombo)
       return
     }
+    if (msg.t === 'FINAL_RESULT') {
+      cb.onFinal?.(msg.players, msg.winnerId)
+      return
+    }
     // 其余消息只给主回调，避免观察者重复处理房间状态机
     if (cb !== this.cb) return
     this.dispatchRest(msg)
@@ -356,7 +362,6 @@ export class BattleClient {
         this.cb.onCountdown?.(msg.startAtServerMs, msg.leadMs)
         break
       case 'FINAL_RESULT':
-        this.cb.onFinal?.(msg.players, msg.winnerId)
         break
       case 'ERROR':
         this.rejectAudioUpload(new Error(msg.message))
@@ -512,8 +517,13 @@ export class BattleClient {
     })
   }
 
-  finish(score: number, accuracy: number, maxCombo: number): void {
-    this.send({ t: 'FINISH', score, accuracy, maxCombo })
+  finish(
+    score: number,
+    accuracy: number,
+    maxCombo: number,
+    counts: Record<Judgment, number>,
+  ): void {
+    this.send({ t: 'FINISH', score, accuracy, maxCombo, counts })
   }
 
   leave(): void {

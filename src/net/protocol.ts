@@ -10,7 +10,17 @@
  * 服务端用 `Date.now()`，两者靠 NTP 式握手换算。
  */
 
-import type { Chart } from '../types'
+import type { Chart, Judgment } from '../types'
+
+export interface BattlePlayerResult {
+  playerId: string
+  score: number
+  accuracy: number
+  maxCombo: number
+  grade: string
+  counts: Record<Judgment, number>
+  totalNotes: number
+}
 
 // ─────────────────────────── 客户端 → 服务端 ───────────────────────────
 
@@ -45,7 +55,13 @@ export type ClientMessage =
       accuracy: number
       progress: number
     }
-  | { t: 'FINISH'; score: number; accuracy: number; maxCombo: number }
+  | {
+      t: 'FINISH'
+      score: number
+      accuracy: number
+      maxCombo: number
+      counts: Record<Judgment, number>
+    }
   | { t: 'LEAVE' }
 
 // ─────────────────────────── 服务端 → 客户端 ───────────────────────────
@@ -96,7 +112,7 @@ export type ServerMessage =
   | { t: 'OPPONENT_FINISHED'; score: number; accuracy: number; maxCombo: number }
   | {
       t: 'FINAL_RESULT'
-      players: { playerId: string; score: number; accuracy: number; maxCombo: number }[]
+      players: BattlePlayerResult[]
       winnerId: string | null
     }
 

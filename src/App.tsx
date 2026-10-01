@@ -27,6 +27,7 @@ import { DebugChart } from './ui/DebugChart'
 import { Lobby, type BattleStart } from './ui/Lobby'
 import { EntryLoader, ScreenTransition, type TransitionPhase } from './ui/Transitions'
 import type { GameResult } from './core/engine'
+import type { BattlePlayerResult } from './net/protocol'
 
 type Screen = 'start' | 'select' | 'game' | 'result' | 'calibrate' | 'debug' | 'lobby'
 
@@ -60,6 +61,10 @@ export function App() {
   const [song, setSong] = useState<LoadedSong | null>(null)
   /** 对战开局数据。非空表示当前这一局是对战。 */
   const [battlePlay, setBattlePlay] = useState<BattleStart | null>(null)
+  const [battleFinal, setBattleFinal] = useState<{
+    players: BattlePlayerResult[]
+    winnerId: string | null
+  } | null>(null)
   const [result, setResult] = useState<GameResult | null>(null)
   const [audioState, setAudioState] = useState<AudioContextState>('suspended')
 
@@ -239,6 +244,22 @@ export function App() {
     }
   }, [battlePlay])
 
+  // 结算消息比本地最后一帧晚到；连接所有权在 App，等离开对战页后再释放。
+  useEffect(() => {
+    if (!battlePlay) {
+      setBattleFinal(null)
+      return
+    }
+    setBattleFinal(null)
+    const unsubscribe = battlePlay.client.observe({
+      onFinal: (players, winnerId) => setBattleFinal({ players, winnerId }),
+    })
+    return () => {
+      unsubscribe()
+      battlePlay.client.dispose()
+    }
+  }, [battlePlay])
+
   // 当前这一局要打的谱面与音频：对战优先，其次单机
   const activeChart: Chart | null = battlePlay?.chart ?? song?.generated.chart ?? null
   const activeBuffer: AudioBuffer | null = battlePlay?.audioBuffer ?? song?.decoded.buffer ?? null
@@ -355,6 +376,9 @@ export function App() {
             analysis={battlePlay ? null : (song?.analysis ?? null)}
             quality={battlePlay ? null : (song?.generated.quality ?? null)}
             isBattle={battlePlay != null}
+            battleFinal={battleFinal?.players ?? null}
+            battleWinnerId={battleFinal?.winnerId ?? null}
+            battlePlayerId={battlePlay?.client.playerId ?? null}
             onRetry={() => navigate('game', 'RETRY')}
             onBack={() => {
               setBattlePlay(null)

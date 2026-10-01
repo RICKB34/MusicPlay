@@ -63,10 +63,6 @@ export function GameScreen({
   finishRef.current = onFinish
   const exitRef = useRef(onExit)
   exitRef.current = onExit
-  const battleClient = battle?.client ?? null
-
-  // 网络连接从大厅移交给游戏页后，由游戏页负责最终释放。
-  useEffect(() => () => battleClient?.dispose(), [battleClient])
 
   /**
    * 开局提前量。
@@ -114,7 +110,7 @@ export function GameScreen({
       },
       onFinish: (r) => {
         // 对战模式上报成绩
-        battle?.client.finish(r.score, r.accuracy, r.maxCombo)
+        battle?.client.finish(r.score, r.accuracy, r.maxCombo, r.counts)
         finishRef.current(r)
       },
       onScore: battle
