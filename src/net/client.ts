@@ -31,7 +31,12 @@ export interface BattleCallbacks {
   onPlayerLeft?: (playerId: string) => void
   onChart?: (chart: Chart, fingerprint: string) => void
   /** 加入者收到房主上传的完整音频。 */
-  onAudio?: (audio: ArrayBuffer, fingerprint: string, fileName: string) => void
+  onAudio?: (
+    audio: ArrayBuffer,
+    fingerprint: string,
+    sourceId: string,
+    fileName: string,
+  ) => void
   onOpponentReady?: (ready: boolean) => void
   onCountdown?: (startAtServerMs: number, leadMs: number) => void
   onOpponentScore?: (snapshot: ScoreSnapshot) => void
@@ -93,6 +98,7 @@ export class BattleClient {
   private incomingAudio: {
     size: number
     fingerprint: string
+    sourceId: string
     fileName: string
     received: number
     chunks: Uint8Array[]
@@ -316,6 +322,7 @@ export class BattleClient {
         this.incomingAudio = {
           size: msg.size,
           fingerprint: msg.fingerprint,
+          sourceId: msg.sourceId,
           fileName: msg.fileName,
           received: 0,
           chunks: [],
@@ -334,7 +341,12 @@ export class BattleClient {
           bytes.set(chunk, offset)
           offset += chunk.byteLength
         }
-        this.cb.onAudio?.(bytes.buffer, incoming.fingerprint, incoming.fileName)
+        this.cb.onAudio?.(
+          bytes.buffer,
+          incoming.fingerprint,
+          incoming.sourceId,
+          incoming.fileName,
+        )
         break
       }
       case 'OPPONENT_READY':
@@ -432,6 +444,7 @@ export class BattleClient {
   async uploadAudio(
     audio: ArrayBuffer,
     fingerprint: string,
+    sourceId: string,
     fileName: string,
     onProgress?: (ratio: number) => void,
   ): Promise<void> {
@@ -459,7 +472,13 @@ export class BattleClient {
     void accepted.catch(() => {})
 
     try {
-      this.send({ t: 'AUDIO_BEGIN', size: audio.byteLength, fingerprint, fileName })
+      this.send({
+        t: 'AUDIO_BEGIN',
+        size: audio.byteLength,
+        fingerprint,
+        sourceId,
+        fileName,
+      })
       for (let offset = 0; offset < bytes.byteLength; offset += chunkSize) {
         while (ws.readyState === WebSocket.OPEN && ws.bufferedAmount > 4 * 1024 * 1024) {
           await new Promise((resolve) => window.setTimeout(resolve, 10))

@@ -155,6 +155,7 @@ async function main() {
     t: 'AUDIO_BEGIN',
     size: audio.byteLength,
     fingerprint: 'test-fp-123',
+    sourceId: `raw-${audio.byteLength}`,
     fileName: 'smoke.mp3',
   })
   host.ws.send(audio)
@@ -166,7 +167,9 @@ async function main() {
   const guestAudio = Buffer.concat(guest.audioChunks)
   check(
     '房主音频完整转发给加入者',
-    audioBegin.size === audio.byteLength && guestAudio.equals(audio),
+    audioBegin.size === audio.byteLength &&
+      audioBegin.sourceId === `raw-${audio.byteLength}` &&
+      guestAudio.equals(audio),
     `${guestAudio.byteLength} bytes`,
   )
 

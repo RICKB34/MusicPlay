@@ -133,6 +133,7 @@ class Room {
     this.audioSize = 0
     this.audioOffset = 0
     this.audioFingerprint = null
+    this.audioSourceId = null
     this.audioFileName = null
     this.audioComplete = false
     this.ready = new Set()
@@ -161,7 +162,9 @@ class Room {
 
   /** 把已保存的音频分块发给指定玩家。 */
   sendAudioTo(playerId) {
-    if (!this.audioComplete || !this.audioBytes || !this.audioFingerprint) return
+    if (!this.audioComplete || !this.audioBytes || !this.audioFingerprint || !this.audioSourceId) {
+      return
+    }
     const ws = this.players.get(playerId)
     if (!ws || ws.readyState !== ws.OPEN) return
 
@@ -169,6 +172,7 @@ class Room {
       t: 'AUDIO_BEGIN',
       size: this.audioSize,
       fingerprint: this.audioFingerprint,
+      sourceId: this.audioSourceId,
       fileName: this.audioFileName,
     })
     const chunkSize = 256 * 1024
@@ -397,6 +401,7 @@ wss.on('connection', (ws) => {
         room.audioSize = size
         room.audioOffset = 0
         room.audioFingerprint = String(msg.fingerprint ?? '')
+        room.audioSourceId = String(msg.sourceId ?? '')
         room.audioFileName = String(msg.fileName ?? 'battle-audio')
         room.audioComplete = false
         room.ready.clear()

@@ -15,6 +15,7 @@ import { getAudioContext } from '../state/audioContext'
 import { decodeArrayBuffer, describeDecodeError, type DecodedAudio } from '../analysis/decode'
 import { runAnalysis } from '../analysis/analyzeClient'
 import { generateChart } from '../chartgen/generate'
+import { battleAudioIdOf } from '../net/protocol'
 import { BattleClient, defaultServerUrl, type ConnectionState } from '../net/client'
 import type { ScoreSnapshot } from '../types'
 
@@ -130,19 +131,22 @@ export function Lobby({ settings, current, onStart, onBack }: Props) {
         setChart(incoming)
         setFingerprint(fp)
         // 房主只收到服务器回执；加入者随后会自动收到原始音频。
-        setDecoded((mine) => {
-          if (mine && mine.fingerprint !== incoming.meta.audioFingerprint) {
-            setError('收到的谱面和音频不匹配，请让房主重新选择歌曲。')
-          }
-          return mine
-        })
         setStatus(isHostRef.current ? '谱面已发送' : '已收到歌曲信息，正在接收音频…')
       },
-      onAudio: (audio, fp, fileName) => {
+      onAudio: (audio, fp, sourceId, fileName) => {
         if (isHostRef.current) return
         setPhase('loading')
         setStatus('正在解码房主发来的歌曲…')
         void (async () => {
+          // 校验原始文件字节，而不是各设备解码后的 PCM。后者会因浏览器
+          // 解码器实现不同产生极小差异，不能用来判断"是不是同一首歌"。
+          if (battleAudioIdOf(audio) !== sourceId) {
+            setError(`《${fileName}》传输不完整，请让房主重新发送。`)
+            setStatus('歌曲校验失败')
+            setPhase('waiting')
+            return
+          }
+
           let incoming: DecodedAudio
           try {
             incoming = await decodeArrayBuffer(audio, getAudioContext())
@@ -153,19 +157,9 @@ export function Lobby({ settings, current, onStart, onBack }: Props) {
             return
           }
 
-          const chartFingerprint = chartRef.current?.meta.audioFingerprint
-          if (
-            incoming.fingerprint !== fp ||
-            (chartFingerprint && incoming.fingerprint !== chartFingerprint)
-          ) {
-            setError(`《${fileName}》与房主提交的谱面不匹配，请让房主重新发送。`)
-            setStatus('歌曲校验失败')
-            setPhase('waiting')
-            return
-          }
-
           setDecoded(incoming)
-          setFingerprint(incoming.fingerprint)
+          // 统一使用房主生成谱面时的指纹；guest 本机解码结果只用于播放和判定。
+          setFingerprint(fp)
           setPhase('ready')
           setStatus('歌曲已收到，点击「准备」加入对战')
         })()
@@ -275,9 +269,15 @@ export function Lobby({ settings, current, onStart, onBack }: Props) {
       setStatus('正在把歌曲发给对手…')
       try {
         client.submitChart(chart, fingerprint)
-        await client.uploadAudio(audioBytes, fingerprint, `${chart.meta.title}.audio`, (ratio) => {
-          setStatus(`正在发送歌曲 ${Math.round(ratio * 100)}%`)
-        })
+        await client.uploadAudio(
+          audioBytes,
+          fingerprint,
+          battleAudioIdOf(audioBytes),
+          `${chart.meta.title}.audio`,
+          (ratio) => {
+            setStatus(`正在发送歌曲 ${Math.round(ratio * 100)}%`)
+          },
+        )
       } catch (e) {
         setError((e as Error).message)
         setStatus('歌曲发送失败')
