@@ -1483,7 +1483,7 @@ button.ghost {
  * 浮层会被它裁掉（卡片挨着页尾时菜单直接消失），手机上也容易顶出视口。
  * 内展开把下方内容推开，代价只是页面变长，没有裁切和定位的坑。
  */
-.home-theme {
+.select-theme {
   position: fixed;
   top: max(18px, env(safe-area-inset-top));
   right: max(20px, env(safe-area-inset-right));
@@ -1505,7 +1505,7 @@ button.ghost {
   flex: 0 1 auto;
 }
 
-/* Home 的浮层脱离 .screen 的滚动裁剪，始终锚定在右上角。
+/* 选曲页的浮层脱离 .screen 的滚动裁剪，始终锚定在右上角。
  * 高度受视口限制，主题多时面板内部自己滚动。 */
 .theme-picker--compact .theme-menu {
   position: fixed;
@@ -1834,6 +1834,17 @@ button.ghost {
 input[type='range'] {
   width: 100%;
   accent-color: var(--accent);
+}
+
+.speed-control {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.speed-control input {
+  min-height: 44px;
 }
 
 /* ══════════════ 遮罩 ══════════════

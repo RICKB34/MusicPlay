@@ -232,8 +232,11 @@ export class RhythmGame {
     const event = this.judger.handleInput(lane, songTimeSec)
     if (!event) return
 
-    // 长按的头部（deferred）只给视觉反馈，整条长按在尾部结算一次
-    if (!event.deferred) this.scorer.apply(event.judgment)
+    // 长按头部只进入 holding；不出判定特效、不计分，防止"点一下就算命中"。
+    // 尾部仍按住时由 settleHolds 结算，提前松手则由 handleLaneUp 判 miss。
+    if (event.deferred) return
+
+    this.scorer.apply(event.judgment)
 
     this.effects.push({
       lane,

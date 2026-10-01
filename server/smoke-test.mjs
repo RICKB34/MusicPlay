@@ -2,7 +2,7 @@
  * 对战服务冒烟测试 —— 模拟两个玩家完成一整套流程。
  *
  * 不依赖浏览器，所以可以在启动服务后立刻验证协议是否正确：
- *   建房 → 加入 → 时钟同步 → 提交谱面 → 双方准备 → 收到开局时间轴
+ *   建房 → 加入 → 时钟同步 → 提交谱面与音频 → 双方准备 → 收到开局时间轴
  *   → 上报分数 → 双方结束 → 收到结算
  *
  * 用法：先 `node server/index.js`，再 `node server/smoke-test.mjs`
@@ -16,9 +16,14 @@ const TIMEOUT_MS = 15000
 function makePlayer(label) {
   const ws = new WebSocket(URL)
   const received = []
+  const audioChunks = []
   const waiters = []
 
-  ws.on('message', (raw) => {
+  ws.on('message', (raw, isBinary) => {
+    if (isBinary) {
+      audioChunks.push(Buffer.from(raw))
+      return
+    }
     const msg = JSON.parse(String(raw))
     received.push(msg)
     for (let i = waiters.length - 1; i >= 0; i--) {
@@ -33,6 +38,7 @@ function makePlayer(label) {
     label,
     ws,
     received,
+    audioChunks,
     send: (msg) => ws.send(JSON.stringify(msg)),
     /** 等一条满足条件的消息。 */
     waitFor: (predicate, description) =>
@@ -140,6 +146,28 @@ async function main() {
   check(
     '谱面正确转发给对手',
     relayed.chart?.notes?.length === 2 && relayed.fingerprint === 'test-fp-123',
+  )
+
+  // ── 音频中转：加入者不再本地选歌，必须收到房主上传的原始字节 ──
+  const audio = Buffer.from('SYNTHETIC-BATTLE-AUDIO')
+  const audioEndPromise = guest.waitFor((m) => m.t === 'AUDIO_END', 'AUDIO_END')
+  host.send({
+    t: 'AUDIO_BEGIN',
+    size: audio.byteLength,
+    fingerprint: 'test-fp-123',
+    fileName: 'smoke.mp3',
+  })
+  host.ws.send(audio)
+  host.send({ t: 'AUDIO_END' })
+
+  await host.waitFor((m) => m.t === 'AUDIO_ACCEPTED', 'AUDIO_ACCEPTED')
+  const audioBegin = await guest.waitFor((m) => m.t === 'AUDIO_BEGIN', 'AUDIO_BEGIN')
+  await audioEndPromise
+  const guestAudio = Buffer.concat(guest.audioChunks)
+  check(
+    '房主音频完整转发给加入者',
+    audioBegin.size === audio.byteLength && guestAudio.equals(audio),
+    `${guestAudio.byteLength} bytes`,
   )
 
   // ── 双方准备 → 权威时间轴 ──

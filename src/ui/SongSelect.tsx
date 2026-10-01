@@ -4,8 +4,15 @@
 
 import { useRef } from 'react'
 import type { Difficulty } from '../types'
-import type { Settings } from '../state/settings'
+import {
+  APPROACH_MS_MAX,
+  APPROACH_MS_MIN,
+  APPROACH_MS_STEP,
+  normalizeApproachMs,
+  type Settings,
+} from '../state/settings'
 import { keyHint } from '../core/input'
+import { ThemePicker } from './ThemePicker'
 
 interface Props {
   settings: Settings
@@ -27,12 +34,31 @@ const DIFFICULTY_LABELS: Record<Difficulty, string> = {
   hard: '困难',
 }
 
+function fallSpeedLabel(approachMs: number): string {
+  if (approachMs >= 1700) return '很慢'
+  if (approachMs >= 1300) return '慢'
+  if (approachMs >= 1050) return '偏慢'
+  if (approachMs >= 800) return '标准'
+  if (approachMs >= 650) return '快'
+  return '很快'
+}
+
 export function SongSelect(props: Props) {
   const { settings, onChange, analyzing, progress, error, songTitle } = props
   const inputRef = useRef<HTMLInputElement>(null)
+  const fallSpeedValue = APPROACH_MS_MIN + APPROACH_MS_MAX - settings.approachMs
+  const fallSpeed = fallSpeedLabel(settings.approachMs)
 
   return (
     <div className="screen">
+      <div className="select-theme">
+        <ThemePicker
+          value={settings.theme}
+          onChange={(theme) => onChange({ theme })}
+          variant="compact"
+        />
+      </div>
+
       <h1>选一首歌</h1>
       <p className="muted">
         支持 MP3 / WAV / M4A。FLAC 在部分浏览器（尤其 Safari）无法解码，遇到问题请先转成 MP3。
@@ -68,6 +94,31 @@ export function SongSelect(props: Props) {
         </div>
         <p className="muted" style={{ marginTop: 8 }}>
           键位：{keyHint(settings.columns)}
+        </p>
+
+        <h2 style={{ marginTop: 16 }}>下落速度</h2>
+        <div className="speed-control">
+          <span className="muted">慢</span>
+          <input
+            type="range"
+            min={APPROACH_MS_MIN}
+            max={APPROACH_MS_MAX}
+            step={APPROACH_MS_STEP}
+            value={fallSpeedValue}
+            aria-label="下落速度"
+            aria-valuetext={`${fallSpeed}，音符提前 ${settings.approachMs} 毫秒出现`}
+            onChange={(e) =>
+              onChange({
+                approachMs: normalizeApproachMs(
+                  APPROACH_MS_MIN + APPROACH_MS_MAX - Number(e.target.value),
+                ),
+              })
+            }
+          />
+          <span className="muted">快</span>
+        </div>
+        <p className="muted" style={{ marginTop: 8 }}>
+          当前：<strong>{fallSpeed}</strong>。只改变音符下落快慢，音乐和判定时间不变。
         </p>
       </div>
 

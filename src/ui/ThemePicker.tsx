@@ -14,7 +14,7 @@ import { THEMES, type ThemeKey } from '../state/theme'
 interface Props {
   value: ThemeKey
   onChange: (key: ThemeKey) => void
-  /** `inline`：跟随文档流；`compact`：Home 右上角使用的紧凑浮层。 */
+  /** `inline`：跟随文档流；`compact`：选曲页右上角使用的紧凑浮层。 */
   variant?: 'inline' | 'compact'
 }
 

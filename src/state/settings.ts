@@ -38,6 +38,18 @@ export const DEFAULT_SETTINGS: Settings = {
   theme: DEFAULT_THEME_KEY,
 }
 
+/** 下落速度滑块的取值范围。`approachMs` 越大，音符出现得越早、速度越慢。 */
+export const APPROACH_MS_MIN = 500
+export const APPROACH_MS_MAX = 2000
+export const APPROACH_MS_STEP = 50
+
+export function normalizeApproachMs(value: unknown): number {
+  const fallback = DEFAULT_SETTINGS.approachMs
+  const numeric = typeof value === 'number' && Number.isFinite(value) ? value : fallback
+  const clamped = Math.min(APPROACH_MS_MAX, Math.max(APPROACH_MS_MIN, numeric))
+  return Math.round(clamped / APPROACH_MS_STEP) * APPROACH_MS_STEP
+}
+
 const KEY = 'rhythm-forge:settings:v1'
 
 export function loadSettings(): Settings {
@@ -47,8 +59,14 @@ export function loadSettings(): Settings {
     const parsed = JSON.parse(raw) as Partial<Settings> & { chartSource?: unknown }
     delete parsed.chartSource
     // 逐字段回落，避免旧版本存档缺字段导致 undefined 扩散。
+    // approachMs 额外收敛，旧存档或手工改坏的值不能把画布推进异常速度。
     // theme 额外做一次收敛：它会被直接写进 <html data-theme>，脏值不能放行。
-    return { ...DEFAULT_SETTINGS, ...parsed, theme: normalizeThemeKey(parsed.theme) }
+    return {
+      ...DEFAULT_SETTINGS,
+      ...parsed,
+      approachMs: normalizeApproachMs(parsed.approachMs),
+      theme: normalizeThemeKey(parsed.theme),
+    }
   } catch {
     return { ...DEFAULT_SETTINGS }
   }

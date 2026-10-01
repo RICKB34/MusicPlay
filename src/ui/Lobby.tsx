@@ -1,12 +1,11 @@
 /**
  * 对战大厅。
  *
- * 流程：连接服务器 → 建房/加入 → 双方各自加载同一首歌的本地文件
- * → 房主生成并提交谱面 → 服务器转发给对手 → 双方准备 → 服务器下发权威时间轴 → 开打。
+ * 流程：连接服务器 → 房主建房并选择歌曲 → 加入者输房间码
+ * → 服务器把房主的谱面与音频转给加入者 → 双方准备 → 服务器下发权威时间轴 → 开打。
  *
- * **关键校验**：对手收到谱面后要核对 `audioFingerprint` 与自己本地文件是否一致。
- * 两人用的不是同一个音频文件的话，谱面时间轴会完全错位——这是演示现场最容易
- * 翻车的地方，10 行代码就能防住。
+ * **关键校验**：加入者解出音频后，要用 `audioFingerprint` 核对它与收到的谱面
+ * 是否一致。传输过程中丢包或截断都必须在这里拦住，不能让错位时间轴进入游戏。
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -36,7 +35,12 @@ export interface BattleStart {
 interface Props {
   settings: Settings
   /** 当前已加载的歌曲（可选）。房主直接复用它，免去重新分析。 */
-  current: { chart: Chart; decoded: DecodedAudio; fileName: string } | null
+  current: {
+    chart: Chart
+    decoded: DecodedAudio
+    fileName: string
+    sourceBytes: ArrayBuffer
+  } | null
   onStart: (payload: BattleStart) => void
   onBack: () => void
 }
@@ -49,6 +53,7 @@ export function Lobby({ settings, current, onStart, onBack }: Props) {
   const [roomCode, setRoomCode] = useState('')
   const [joinCode, setJoinCode] = useState('')
   const [isHost, setIsHost] = useState(false)
+  const isHostRef = useRef(false)
   const [opponentPresent, setOpponentPresent] = useState(false)
   const [opponentReady, setOpponentReady] = useState(false)
   const [rtt, setRtt] = useState<number | null>(null)
@@ -59,7 +64,9 @@ export function Lobby({ settings, current, onStart, onBack }: Props) {
   const [chart, setChart] = useState<Chart | null>(null)
   const [decoded, setDecoded] = useState<DecodedAudio | null>(null)
   const [fingerprint, setFingerprint] = useState<string | null>(null)
+  const [audioBytes, setAudioBytes] = useState<ArrayBuffer | null>(null)
   const [myReady, setMyReady] = useState(false)
+  const [sending, setSending] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const startRef = useRef(onStart)
   startRef.current = onStart
@@ -79,18 +86,24 @@ export function Lobby({ settings, current, onStart, onBack }: Props) {
       onRoomCreated: (code) => {
         setRoomCode(code)
         setIsHost(true)
+        isHostRef.current = true
         setPhase('waiting')
-        setStatus('把房间码告诉朋友')
+        setStatus('请选择歌曲，并把房间码告诉朋友')
       },
       onJoined: (code) => {
         setRoomCode(code)
         setIsHost(false)
+        isHostRef.current = false
+        // 能成功加入，房主必然已经在房间里。
+        setOpponentPresent(true)
         setPhase('waiting')
-        setStatus('已加入房间')
+        setStatus('已加入房间，等待房主选择歌曲')
       },
       onPlayerJoined: () => {
         setOpponentPresent(true)
-        setStatus('对手已加入，请各自加载同一首歌')
+        setStatus(
+          isHostRef.current ? '对手已加入，请选择歌曲' : '已加入房间，等待房主选择歌曲',
+        )
       },
       onPlayerLeft: () => {
         setOpponentPresent(false)
@@ -100,14 +113,46 @@ export function Lobby({ settings, current, onStart, onBack }: Props) {
       onChart: (incoming, fp) => {
         setChart(incoming)
         setFingerprint(fp)
-        // 校验：对手发来的谱面所基于的音频，必须和我加载的是同一个文件
+        // 房主只收到服务器回执；加入者随后会自动收到原始音频。
         setDecoded((mine) => {
           if (mine && mine.fingerprint !== incoming.meta.audioFingerprint) {
-            setError('对手用的音频文件和你不是同一个。请确保双方选择的是完全相同的那个文件。')
+            setError('收到的谱面和音频不匹配，请让房主重新选择歌曲。')
           }
           return mine
         })
-        setStatus('已收到对手的谱面')
+        setStatus(isHostRef.current ? '谱面已发送' : '已收到歌曲信息，正在接收音频…')
+      },
+      onAudio: (audio, fp, fileName) => {
+        if (isHostRef.current) return
+        setPhase('loading')
+        setStatus('正在解码房主发来的歌曲…')
+        void (async () => {
+          let incoming: DecodedAudio
+          try {
+            incoming = await decodeArrayBuffer(audio, getAudioContext())
+          } catch (e) {
+            setError(describeDecodeError(e))
+            setStatus('歌曲解码失败')
+            setPhase('waiting')
+            return
+          }
+
+          const chartFingerprint = chartRef.current?.meta.audioFingerprint
+          if (
+            incoming.fingerprint !== fp ||
+            (chartFingerprint && incoming.fingerprint !== chartFingerprint)
+          ) {
+            setError(`《${fileName}》与房主提交的谱面不匹配，请让房主重新发送。`)
+            setStatus('歌曲校验失败')
+            setPhase('waiting')
+            return
+          }
+
+          setDecoded(incoming)
+          setFingerprint(incoming.fingerprint)
+          setPhase('ready')
+          setStatus('歌曲已收到，点击「准备」加入对战')
+        })()
       },
       onOpponentReady: setOpponentReady,
       onCountdown: (startAtServerMs, leadMs) => {
@@ -148,14 +193,16 @@ export function Lobby({ settings, current, onStart, onBack }: Props) {
 
   // 复用 App 里已加载的歌曲
   useEffect(() => {
-    if (current && !chart) {
+    // 加入者哪怕之前在单机选过歌，也不能拿那首歌充当房主的选择。
+    if (isHost && current && !chart) {
       setChart(current.chart)
       setDecoded(current.decoded)
       setFingerprint(current.decoded.fingerprint)
+      setAudioBytes(current.sourceBytes)
     }
-  }, [current, chart])
+  }, [current, chart, isHost])
 
-  /** 加载本地音频并生成谱面（房主提交用；客人只需解码以做指纹校验）。 */
+  /** 加载本地音频并生成谱面。只有房主会走这条路径。 */
   const handleFile = useCallback(
     async (file: File) => {
       setError(null)
@@ -164,7 +211,8 @@ export function Lobby({ settings, current, onStart, onBack }: Props) {
       try {
         const ctx = getAudioContext()
         const buf = await file.arrayBuffer()
-        const dec = await decodeArrayBuffer(buf, ctx)
+        // decodeAudioData 可能转移原始缓冲区；房主之后还要原样发给对手。
+        const dec = await decodeArrayBuffer(buf.slice(0), ctx)
 
         const analysis = await runAnalysis(dec.mono.slice(), {
           fs: dec.sampleRate,
@@ -180,7 +228,8 @@ export function Lobby({ settings, current, onStart, onBack }: Props) {
         setDecoded(dec)
         setFingerprint(dec.fingerprint)
         setChart(generated.chart)
-        setStatus('分析完成，点「准备」提交给对手')
+        setAudioBytes(buf)
+        setStatus('分析完成，点「准备」把歌曲发给对手')
         setPhase('ready')
       } catch (e) {
         setError(describeDecodeError(e))
@@ -190,18 +239,40 @@ export function Lobby({ settings, current, onStart, onBack }: Props) {
     [settings.analysisProfile, settings.difficulty, settings.columns],
   )
 
-  const handleReady = useCallback(() => {
+  const handleReady = useCallback(async () => {
     const client = clientRef.current
-    if (!client || !chart) {
-      setError('还没有谱面。请先加载一首本地音乐。')
+    if (!client || !chart || !decoded) {
+      setError('还没有可用的歌曲。请让房主先选择一首本地音乐。')
       return
     }
-    // 房主负责把谱面推给对手
-    if (isHost && fingerprint) client.submitChart(chart, fingerprint)
+
+    if (isHost) {
+      if (sending) return
+      if (!audioBytes || !fingerprint) {
+        setError('原始音频不可用，请重新选择歌曲。')
+        return
+      }
+      setSending(true)
+      setError(null)
+      setStatus('正在把歌曲发给对手…')
+      try {
+        client.submitChart(chart, fingerprint)
+        await client.uploadAudio(audioBytes, fingerprint, `${chart.meta.title}.audio`, (ratio) => {
+          setStatus(`正在发送歌曲 ${Math.round(ratio * 100)}%`)
+        })
+      } catch (e) {
+        setError((e as Error).message)
+        setStatus('歌曲发送失败')
+        setSending(false)
+        return
+      }
+      setSending(false)
+    }
+
     client.setReady(true)
     setMyReady(true)
     setStatus('已准备，等待对手…')
-  }, [chart, isHost, fingerprint])
+  }, [audioBytes, chart, decoded, fingerprint, isHost, sending])
 
   const canInteract = connState === 'open'
 
@@ -292,7 +363,9 @@ export function Lobby({ settings, current, onStart, onBack }: Props) {
               </span>
             </p>
           ) : (
-            <p className="muted">还没有加载歌曲。</p>
+            <p className="muted">
+              {isHost ? '还没有选择歌曲。' : '等待房主选择歌曲…'}
+            </p>
           )}
 
           {opponentPresent && (
@@ -301,24 +374,24 @@ export function Lobby({ settings, current, onStart, onBack }: Props) {
             </p>
           )}
 
-          {!chart && (
+          {isHost && !chart && (
             <button
               className="primary"
               style={{ width: '100%', marginTop: 12 }}
               onClick={() => fileRef.current?.click()}
             >
-              加载本地音乐（双方必须是同一个文件）
+              选择本地音乐
             </button>
           )}
 
-          {chart && !myReady && phase !== 'countdown' && (
+          {chart && decoded && !myReady && phase !== 'countdown' && (
             <button
               className="primary"
               style={{ width: '100%', marginTop: 12 }}
-              disabled={!opponentPresent}
-              onClick={handleReady}
+              disabled={!opponentPresent || sending}
+              onClick={() => void handleReady()}
             >
-              {opponentPresent ? '准备' : '等待对手加入…'}
+              {sending ? '正在发送歌曲…' : opponentPresent ? '准备' : '等待对手加入…'}
             </button>
           )}
 
@@ -341,17 +414,19 @@ export function Lobby({ settings, current, onStart, onBack }: Props) {
         </p>
       </div>
 
-      <input
-        ref={fileRef}
-        type="file"
-        accept="audio/*"
-        style={{ display: 'none' }}
-        onChange={(e) => {
-          const f = e.target.files?.[0]
-          if (f) void handleFile(f)
-          e.target.value = ''
-        }}
-      />
+      {isHost && (
+        <input
+          ref={fileRef}
+          type="file"
+          accept="audio/*"
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            const f = e.target.files?.[0]
+            if (f) void handleFile(f)
+            e.target.value = ''
+          }}
+        />
+      )}
 
       <button className="ghost" onClick={onBack}>
         返回

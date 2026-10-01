@@ -71,7 +71,7 @@ describe('长按判定', () => {
     expect(settled[0]!.note.state).toBe('hit')
   })
 
-  it('断触封顶为 good，而不是 miss', () => {
+  it('按不到三分之二就松手判 miss，不能只点一下头部就算命中', () => {
     const j = new Judger(chart([HOLD]))
     j.handleInput(0, 1.0) // 头判 perfect
 
@@ -79,7 +79,18 @@ describe('长按判定', () => {
     const out = j.handleRelease(0, 1.5)
 
     expect(out).toHaveLength(1)
-    // 玩家确实按住了头也按住了一段，不该否定掉已完成的部分
+    expect(out[0]!.judgment).toBe('miss')
+    expect(out[0]!.note.state).toBe('missed')
+  })
+
+  it('按住超过三分之二后松手不算 miss，但封顶为 good', () => {
+    const j = new Judger(chart([HOLD]))
+    j.handleInput(0, 1.0) // 头判 perfect
+
+    // 整条 2s，2.5s 松手时已经按了 1.5s，达到四分之三。
+    const out = j.handleRelease(0, 2.5)
+
+    expect(out).toHaveLength(1)
     expect(out[0]!.judgment).toBe('good')
     expect(out[0]!.note.state).toBe('hit')
   })
@@ -103,7 +114,7 @@ describe('长按判定', () => {
     expect(out[0]!.judgment).toBe('perfect')
   })
 
-  it('容差边界：卡在 holdReleaseMs 两侧判定相反', () => {
+  it('尾部容差之外：超过三分之二仍为 good，未超过则 miss', () => {
     // cutoff = 松手时刻 + holdReleaseMs >= tailSec 才算完成
     const limit = TAIL - DEFAULT_JUDGMENT.holdReleaseMs / 1000 // 距尾部正好 holdReleaseMs
 
@@ -114,6 +125,10 @@ describe('长按判定', () => {
     const outside = new Judger(chart([HOLD]))
     outside.handleInput(0, 1.0)
     expect(outside.handleRelease(0, limit - 0.01)[0]!.judgment).toBe('good')
+
+    const tooEarly = new Judger(chart([HOLD]))
+    tooEarly.handleInput(0, 1.0)
+    expect(tooEarly.handleRelease(0, 2.3)[0]!.judgment).toBe('miss')
   })
 
   it('长按之后的音符仍能被判定——游标要在 holding 处停住而不是越过', () => {

@@ -11,7 +11,7 @@
 import type { Chart, ScoreSnapshot } from '../types'
 import { deserializeChart } from '../chartgen/serialize'
 import { ClockSync, localNowMs } from './sync'
-import type { ClientMessage, ServerMessage } from './protocol'
+import { MAX_BATTLE_AUDIO_BYTES, type ClientMessage, type ServerMessage } from './protocol'
 
 export type ConnectionState = 'idle' | 'connecting' | 'open' | 'closed' | 'error'
 
@@ -22,6 +22,8 @@ export interface BattleCallbacks {
   onPlayerJoined?: (playerId: string) => void
   onPlayerLeft?: (playerId: string) => void
   onChart?: (chart: Chart, fingerprint: string) => void
+  /** 加入者收到房主上传的完整音频。 */
+  onAudio?: (audio: ArrayBuffer, fingerprint: string, fileName: string) => void
   onOpponentReady?: (ready: boolean) => void
   onCountdown?: (startAtServerMs: number, leadMs: number) => void
   onOpponentScore?: (snapshot: ScoreSnapshot) => void
@@ -68,6 +70,18 @@ export class BattleClient {
   private keepAliveTimer: ReturnType<typeof setInterval> | null = null
   private quickSyncRemaining = 0
   private disposed = false
+  private audioUploadWaiter: {
+    resolve: () => void
+    reject: (error: Error) => void
+    timer: number
+  } | null = null
+  private incomingAudio: {
+    size: number
+    fingerprint: string
+    fileName: string
+    received: number
+    chunks: Uint8Array[]
+  } | null = null
   /**
    * 附加观察者。
    *
@@ -112,6 +126,7 @@ export class BattleClient {
       return
     }
     this.ws = ws
+    ws.binaryType = 'arraybuffer'
 
     ws.onopen = () => {
       this.cb.onState?.('open', url)
@@ -126,6 +141,7 @@ export class BattleClient {
     ws.onclose = () => {
       this.cb.onState?.('closed')
       this.stopTimers()
+      this.rejectAudioUpload(new Error('连接已断开，音频发送失败'))
     }
 
     ws.onerror = () => {
@@ -133,9 +149,21 @@ export class BattleClient {
     }
 
     ws.onmessage = (ev) => {
+      if (typeof ev.data !== 'string') {
+        if (ev.data instanceof ArrayBuffer) {
+          this.handleAudioChunk(new Uint8Array(ev.data))
+        } else if (ev.data instanceof Blob) {
+          void ev.data
+            .arrayBuffer()
+            .then((buf) => this.handleAudioChunk(new Uint8Array(buf)))
+            .catch((e) => this.cb.onError?.((e as Error).message))
+        }
+        return
+      }
+
       let msg: ServerMessage
       try {
-        msg = JSON.parse(String(ev.data)) as ServerMessage
+        msg = JSON.parse(ev.data) as ServerMessage
       } catch {
         return
       }
@@ -204,6 +232,43 @@ export class BattleClient {
           this.cb.onError?.(`收到的谱面无效：${(e as Error).message}`)
         }
         break
+      case 'AUDIO_ACCEPTED':
+        this.resolveAudioUpload()
+        break
+      case 'AUDIO_BEGIN':
+        if (
+          !Number.isInteger(msg.size) ||
+          msg.size <= 0 ||
+          msg.size > MAX_BATTLE_AUDIO_BYTES
+        ) {
+          this.cb.onError?.('收到的音频大小不合法')
+          this.incomingAudio = null
+          break
+        }
+        this.incomingAudio = {
+          size: msg.size,
+          fingerprint: msg.fingerprint,
+          fileName: msg.fileName,
+          received: 0,
+          chunks: [],
+        }
+        break
+      case 'AUDIO_END': {
+        const incoming = this.incomingAudio
+        this.incomingAudio = null
+        if (!incoming || incoming.received !== incoming.size) {
+          this.cb.onError?.('音频接收不完整，请让房主重新发送')
+          break
+        }
+        const bytes = new Uint8Array(incoming.size)
+        let offset = 0
+        for (const chunk of incoming.chunks) {
+          bytes.set(chunk, offset)
+          offset += chunk.byteLength
+        }
+        this.cb.onAudio?.(bytes.buffer, incoming.fingerprint, incoming.fileName)
+        break
+      }
       case 'OPPONENT_READY':
         this.cb.onOpponentReady?.(msg.ready)
         break
@@ -214,9 +279,38 @@ export class BattleClient {
         this.cb.onFinal?.(msg.players, msg.winnerId)
         break
       case 'ERROR':
+        this.rejectAudioUpload(new Error(msg.message))
         this.cb.onError?.(msg.message)
         break
     }
+  }
+
+  private handleAudioChunk(chunk: Uint8Array): void {
+    const incoming = this.incomingAudio
+    if (!incoming) return
+    if (incoming.received + chunk.byteLength > incoming.size) {
+      this.incomingAudio = null
+      this.cb.onError?.('音频接收超出声明大小')
+      return
+    }
+    incoming.chunks.push(chunk)
+    incoming.received += chunk.byteLength
+  }
+
+  private resolveAudioUpload(): void {
+    const waiter = this.audioUploadWaiter
+    if (!waiter) return
+    this.audioUploadWaiter = null
+    window.clearTimeout(waiter.timer)
+    waiter.resolve()
+  }
+
+  private rejectAudioUpload(error: Error): void {
+    const waiter = this.audioUploadWaiter
+    if (!waiter) return
+    this.audioUploadWaiter = null
+    window.clearTimeout(waiter.timer)
+    waiter.reject(error)
   }
 
   private ping(): void {
@@ -252,6 +346,61 @@ export class BattleClient {
     this.send({ t: 'SUBMIT_CHART', chart, fingerprint })
   }
 
+  /**
+   * 把房主的原始音频分块发给服务端，服务端转发给加入者。
+   *
+   * `bufferedAmount` 背压很重要：直接把几十 MB 塞进 WebSocket 会让浏览器
+   * 为了排队把整份数据复制进内存，低端手机会瞬间卡死。
+   */
+  async uploadAudio(
+    audio: ArrayBuffer,
+    fingerprint: string,
+    fileName: string,
+    onProgress?: (ratio: number) => void,
+  ): Promise<void> {
+    const ws = this.ws
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      throw new Error('对战服务器未连接')
+    }
+    if (audio.byteLength <= 0 || audio.byteLength > MAX_BATTLE_AUDIO_BYTES) {
+      throw new Error('音频文件必须在 30MB 以内，才能通过对战服务器中转')
+    }
+    if (this.audioUploadWaiter) {
+      throw new Error('音频正在发送，请稍候')
+    }
+
+    const bytes = new Uint8Array(audio)
+    const chunkSize = 256 * 1024
+    const accepted = new Promise<void>((resolve, reject) => {
+      const timer = window.setTimeout(() => {
+        if (this.audioUploadWaiter) this.audioUploadWaiter = null
+        reject(new Error('音频发送超时，请重试'))
+      }, 120_000)
+      this.audioUploadWaiter = { resolve, reject, timer }
+    })
+    // 上传过程中可能先收到服务器 ERROR；提前挂一个 no-op，避免 Windows 浏览器报未处理拒绝。
+    void accepted.catch(() => {})
+
+    try {
+      this.send({ t: 'AUDIO_BEGIN', size: audio.byteLength, fingerprint, fileName })
+      for (let offset = 0; offset < bytes.byteLength; offset += chunkSize) {
+        while (ws.readyState === WebSocket.OPEN && ws.bufferedAmount > 4 * 1024 * 1024) {
+          await new Promise((resolve) => window.setTimeout(resolve, 10))
+        }
+        if (ws.readyState !== WebSocket.OPEN) {
+          throw new Error('连接已断开，音频发送失败')
+        }
+        ws.send(bytes.subarray(offset, Math.min(offset + chunkSize, bytes.byteLength)))
+        onProgress?.(Math.min(1, (offset + chunkSize) / bytes.byteLength))
+      }
+      this.send({ t: 'AUDIO_END' })
+      await accepted
+    } catch (e) {
+      this.rejectAudioUpload(e as Error)
+      throw e
+    }
+  }
+
   setReady(ready: boolean): void {
     this.send({ t: 'READY', ready })
   }
@@ -285,6 +434,8 @@ export class BattleClient {
 
   close(): void {
     this.stopTimers()
+    this.rejectAudioUpload(new Error('连接已关闭'))
+    this.incomingAudio = null
     if (this.ws) {
       this.ws.onopen = null
       this.ws.onclose = null

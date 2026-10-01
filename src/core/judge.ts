@@ -15,6 +15,15 @@ import { DEFAULT_JUDGMENT, NOTE_HOLD, type JudgmentConfig } from '../types'
 
 export type NoteState = 'pending' | 'holding' | 'hit' | 'missed'
 
+/**
+ * 长按提前松手的成功门槛。
+ *
+ * 按满三分之二后松手不再判 Miss，但只能封顶 Good；按得更久、进入尾部
+ * 容差后才沿用头部判定的等级。这样既不要求玩家机械地按到最后一毫秒，
+ * 又不会让头部点一下就成功。
+ */
+const HOLD_BREAK_SUCCESS_RATIO = 2 / 3
+
 export interface RuntimeNote {
   note: Note
   /** 音符时刻（秒），避免每次判定都做 `/1000`。 */
@@ -41,7 +50,8 @@ export interface JudgmentEvent {
   /**
    * 是否**延后计分**。
    *
-   * 长按的头部为 true：按下只给视觉反馈，整条长按在尾部结算一次。
+   * 长按的头部为 true：按下只进入 holding，不出判定特效也不计分；
+   * 后续按提前松手门槛或尾部容差结算一次。
    * 调用方看到这个标记就不该调 `Scorer.apply`。
    */
   deferred?: boolean
@@ -106,7 +116,7 @@ export class Judger {
     const deltaSec = songTimeSec - best.timeSec
     const judgment = this.classify(Math.abs(deltaSec))
 
-    // 长按：进入 holding，等尾部再结算。头部只给视觉反馈（deferred）。
+    // 长按：进入 holding，等尾部再结算；头部本身不产生判定结果（deferred）。
     if (best.note.type === NOTE_HOLD && (best.note.d ?? 0) > 0) {
       best.state = 'holding'
       best.holdGrade = judgment
@@ -139,21 +149,23 @@ export class Judger {
       if (rn.tailSec > cutoff) {
         // ── 断触（hold break）──
         //
-        // **不判 miss。** 玩家确实按住了头、也按住了一段，只是没坚持到尾；
-        // 判 miss 等于否定掉他已经完成的那部分，太严苛。主流做法是把这一下
-        // **封顶**而不是作废（osu!mania 的 hold break 就是这么处理的）。
-        // 这里封顶到 good —— 它是三档里最低的一档，所以对头判为
-        // perfect/great 的情形，效果就是"降级"。
-        //
-        // 与 osu! 的差别：那边断触会**重置 combo**，我们这里仍是一次正常的
-        // good、combo 继续。要断 combo 得动计分器内部状态（见 `holdGrade`
-        // 的说明），代价大于收益。
-        //
-        // 状态标 'hit' 而非 'missed'：这条长按就此定局，不该再被
-        // `settleHolds` 扫到第二次。
-        rn.state = 'hit'
-        rn.judgment = 'good'
-        out.push({ note: rn, judgment: 'good', deltaSec: 0 })
+        // 按满三分之二后提前松手：算完成，但只给最低的 Good。
+        // 不到三分之二：按断触处理，判 Miss 并断 combo。
+        const durationSec = rn.tailSec - rn.timeSec
+        const heldSec = songTimeSec - rn.timeSec
+        const heldEnough = durationSec > 0 && heldSec >= durationSec * HOLD_BREAK_SUCCESS_RATIO
+
+        if (heldEnough) {
+          rn.state = 'hit'
+          rn.judgment = 'good'
+          out.push({ note: rn, judgment: 'good', deltaSec: 0 })
+        } else {
+          // 状态标 'missed' 而非 'hit'：这条长按就此定局，不该再被
+          // `settleHolds` 扫到第二次。
+          rn.state = 'missed'
+          rn.judgment = 'miss'
+          out.push({ note: rn, judgment: 'miss', deltaSec: 0 })
+        }
       } else {
         // 已经在容差内 → 算完成，沿用头判的等级
         rn.state = 'hit'

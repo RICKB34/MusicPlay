@@ -6,33 +6,18 @@
  * 在它的 pointerdown 里同步调用 `unlockAudio()`。
  */
 
-import type { ThemeKey } from '../state/theme'
-import { ThemePicker } from './ThemePicker'
-
 interface StartScreenProps {
   onStart: () => void
   onUnlock: () => void
   error: string | null
-  theme: ThemeKey
-  onThemeChange: (theme: ThemeKey) => void
 }
 
-export function StartScreen({
-  onStart,
-  onUnlock,
-  error,
-  theme,
-  onThemeChange,
-}: StartScreenProps) {
+export function StartScreen({ onStart, onUnlock, error }: StartScreenProps) {
   return (
     <div
       className="screen home-screen"
       style={{ justifyContent: 'center', alignItems: 'center', textAlign: 'center' }}
     >
-      <div className="home-theme">
-        <ThemePicker value={theme} onChange={onThemeChange} variant="compact" />
-      </div>
-
       <div className="brand">Rhythm Forge</div>
       <p style={{ maxWidth: 'min(420px, 100%)' }}>
         选一首你本地的音乐，自动识别它的节奏与音色，生成一份可玩的 4 轨下落式音游谱面。

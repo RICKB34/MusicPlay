@@ -21,6 +21,12 @@ export type ClientMessage =
   | { t: 'JOIN_ROOM'; roomCode: string }
   /** 房主提交谱面，服务端转发给对手。 */
   | { t: 'SUBMIT_CHART'; chart: Chart; fingerprint: string }
+  /**
+   * 房主上传原始音频。元数据走 JSON，音频块走紧随其后的二进制 WebSocket 消息，
+   * 最后以 AUDIO_END 收尾。
+   */
+  | { t: 'AUDIO_BEGIN'; size: number; fingerprint: string; fileName: string }
+  | { t: 'AUDIO_END' }
   | { t: 'READY'; ready: boolean }
   /** 节流上报（2Hz 足够画个进度条）。 */
   | {
@@ -50,6 +56,11 @@ export type ServerMessage =
   | { t: 'ERROR'; message: string }
   /** 房主收到的回执 / 对手收到的谱面。 */
   | { t: 'CHART_RECEIVED'; chart: Chart; fingerprint: string }
+  /** 服务端已完整保存房主上传的音频。 */
+  | { t: 'AUDIO_ACCEPTED' }
+  /** 加入者开始接收房主音频；随后是二进制块和 AUDIO_END。 */
+  | { t: 'AUDIO_BEGIN'; size: number; fingerprint: string; fileName: string }
+  | { t: 'AUDIO_END' }
   | { t: 'OPPONENT_READY'; ready: boolean }
   /** ★ 权威时间轴：双方都必须在 `startAtServerMs` 这一刻开始播放。 */
   | { t: 'COUNTDOWN'; startAtServerMs: number; leadMs: number }
@@ -71,6 +82,9 @@ export type ServerMessage =
 /** 房间码字符集：去掉 0/O/1/I 这些容易看错的。 */
 export const ROOM_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 export const ROOM_CODE_LENGTH = 4
+
+/** 单个房间允许中转的音频上限。超过时必须给出明确错误，不能把服务端内存打满。 */
+export const MAX_BATTLE_AUDIO_BYTES = 30 * 1024 * 1024
 
 /** 服务器下发的提前量（毫秒）。够双方加载音频、切换界面。 */
 export const COUNTDOWN_LEAD_MS = 4000

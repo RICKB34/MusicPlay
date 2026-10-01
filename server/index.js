@@ -26,6 +26,8 @@ const ROOT = fileURLToPath(new URL('../dist', import.meta.url))
 const ROOM_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 const ROOM_CODE_LENGTH = 4
 const COUNTDOWN_LEAD_MS = 4000
+/** 单个房间允许中转的音频上限，与前端 protocol.ts 保持一致。 */
+const MAX_AUDIO_BYTES = 30 * 1024 * 1024
 /** 房间空闲多久后回收（毫秒）。 */
 const ROOM_TTL_MS = 30 * 60 * 1000
 
@@ -116,12 +118,20 @@ function generateRoomCode() {
 }
 
 class Room {
-  constructor(code) {
+  constructor(code, hostId) {
     this.code = code
+    this.hostId = hostId
     /** @type {Map<string, import('ws').WebSocket>} */
     this.players = new Map()
     this.chart = null
     this.fingerprint = null
+    /** @type {Buffer | null} */
+    this.audioBytes = null
+    this.audioSize = 0
+    this.audioOffset = 0
+    this.audioFingerprint = null
+    this.audioFileName = null
+    this.audioComplete = false
     this.ready = new Set()
     /** @type {Map<string, object>} */
     this.finished = new Map()
@@ -146,12 +156,32 @@ class Room {
     if (ws && ws.readyState === ws.OPEN) ws.send(JSON.stringify(msg))
   }
 
+  /** 把已保存的音频分块发给指定玩家。 */
+  sendAudioTo(playerId) {
+    if (!this.audioComplete || !this.audioBytes || !this.audioFingerprint) return
+    const ws = this.players.get(playerId)
+    if (!ws || ws.readyState !== ws.OPEN) return
+
+    send(ws, {
+      t: 'AUDIO_BEGIN',
+      size: this.audioSize,
+      fingerprint: this.audioFingerprint,
+      fileName: this.audioFileName,
+    })
+    const chunkSize = 256 * 1024
+    for (let offset = 0; offset < this.audioBytes.byteLength; offset += chunkSize) {
+      ws.send(this.audioBytes.subarray(offset, Math.min(offset + chunkSize, this.audioBytes.byteLength)))
+    }
+    send(ws, { t: 'AUDIO_END' })
+  }
+
   /** 双方都按下准备后，下发权威时间轴。 */
   maybeStart() {
     if (this.players.size !== 2) return
     if (this.ready.size !== 2) return
     if (this.startAtServerMs > 0) return
     if (!this.chart) return
+    if (!this.audioComplete) return
 
     this.startAtServerMs = Date.now() + COUNTDOWN_LEAD_MS
     this.broadcast({
@@ -196,7 +226,30 @@ wss.on('connection', (ws) => {
   /** @type {Room | null} */
   let room = null
 
-  ws.on('message', (raw) => {
+  ws.on('message', (raw, isBinary) => {
+    // 二进制帧只用于房主上传音频，必须在 JSON 解析之前分流。
+    if (isBinary) {
+      if (
+        room &&
+        room.players.has(playerId) &&
+        playerId === room.hostId &&
+        room.audioBytes &&
+        !room.audioComplete
+      ) {
+        const chunk = Buffer.isBuffer(raw) ? raw : Buffer.from(raw)
+        if (room.audioOffset + chunk.byteLength > room.audioSize) {
+          send(ws, { t: 'ERROR', message: '音频上传超出声明大小' })
+          room.audioBytes = null
+          room.audioOffset = 0
+          return
+        }
+        chunk.copy(room.audioBytes, room.audioOffset)
+        room.audioOffset += chunk.byteLength
+        room.touch()
+      }
+      return
+    }
+
     let msg
     try {
       msg = JSON.parse(String(raw))
@@ -216,7 +269,7 @@ wss.on('connection', (ws) => {
     if (msg.t === 'CREATE_ROOM') {
       if (room) room.players.delete(playerId)
       const code = generateRoomCode()
-      room = new Room(code)
+      room = new Room(code, playerId)
       room.players.set(playerId, ws)
       rooms.set(code, room)
       send(ws, { t: 'ROOM_CREATED', roomCode: code, playerId })
@@ -241,6 +294,14 @@ wss.on('connection', (ws) => {
       room.touch()
       send(ws, { t: 'JOINED', roomCode: code, playerId })
       room.broadcast({ t: 'PLAYER_JOINED', playerId }, playerId)
+      // 晚加入的玩家需要补收房间当前状态，否则房主已经选曲/准备时双方会卡住。
+      if (room.chart) {
+        send(ws, { t: 'CHART_RECEIVED', chart: room.chart, fingerprint: room.fingerprint })
+      }
+      if (room.audioComplete) room.sendAudioTo(playerId)
+      if (room.ready.has(room.hostId)) {
+        send(ws, { t: 'OPPONENT_READY', ready: true })
+      }
       console.log(`[room ${code}] ${playerId} 加入（${room.players.size}/2）`)
       return
     }
@@ -254,9 +315,52 @@ wss.on('connection', (ws) => {
         room.chart = msg.chart
         room.fingerprint = msg.fingerprint
         room.ready.clear()
+        room.broadcast({ t: 'OPPONENT_READY', ready: false })
         // 回执给房主，谱面转发给对手
         send(ws, { t: 'CHART_RECEIVED', chart: msg.chart, fingerprint: msg.fingerprint })
         room.broadcast({ t: 'CHART_RECEIVED', chart: msg.chart, fingerprint: msg.fingerprint }, playerId)
+        break
+      }
+
+      case 'AUDIO_BEGIN': {
+        if (playerId !== room.hostId) {
+          send(ws, { t: 'ERROR', message: '只有房主可以发送歌曲' })
+          break
+        }
+        const size = Number(msg.size)
+        if (!Number.isInteger(size) || size <= 0 || size > MAX_AUDIO_BYTES) {
+          send(ws, { t: 'ERROR', message: '音频文件必须在 30MB 以内' })
+          break
+        }
+        room.audioBytes = Buffer.allocUnsafe(size)
+        room.audioSize = size
+        room.audioOffset = 0
+        room.audioFingerprint = String(msg.fingerprint ?? '')
+        room.audioFileName = String(msg.fileName ?? 'battle-audio')
+        room.audioComplete = false
+        room.ready.clear()
+        room.broadcast({ t: 'OPPONENT_READY', ready: false })
+        break
+      }
+
+      case 'AUDIO_END': {
+        if (playerId !== room.hostId || !room.audioBytes) {
+          send(ws, { t: 'ERROR', message: '没有可完成的音频上传' })
+          break
+        }
+        if (room.audioOffset !== room.audioSize) {
+          send(ws, { t: 'ERROR', message: '音频上传不完整，请重试' })
+          room.audioBytes = null
+          room.audioOffset = 0
+          break
+        }
+        room.audioComplete = true
+        send(ws, { t: 'AUDIO_ACCEPTED' })
+        for (const id of room.players.keys()) {
+          if (id !== playerId) room.sendAudioTo(id)
+        }
+        room.maybeStart()
+        console.log(`[room ${room.code}] 音频已接收（${(room.audioSize / 1024 / 1024).toFixed(1)}MB）`)
         break
       }
 

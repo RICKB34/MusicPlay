@@ -254,6 +254,10 @@ songTime = ctx.currentTime − outputLatency − startCtxTime + userOffset
 
 ### 4. 双人对战：共享时间轴 + 本地判定
 
+房主创建房间并选择本地歌曲，加入者只需要输入房间码。服务器会把房主生成的谱面
+和原始音频临时中转给加入者，加入者无需再手动准备同一个音频文件。
+双方都点击「准备」后才下发权威时间轴。
+
 服务器下发权威时间轴 `startAtServerMs`，双方各自用 NTP 式同步的时钟偏移
 换算成本地 `AudioContext` 时刻，调 `source.start(when)`。
 

@@ -35,6 +35,8 @@ export interface LoadedSong {
   analysis: TrackAnalysis
   generated: GenerateResult
   fileName: string
+  /** 原始音频字节。双人对战时由房主中转给加入者。 */
+  sourceBytes: ArrayBuffer
   /**
    * 鼓点序列，用于游戏中的震动与边框光晕。
    *
@@ -165,7 +167,9 @@ export function App() {
 
         let decoded: DecodedAudio
         try {
-          decoded = await decodeArrayBuffer(buf, ctx)
+          // decodeAudioData 可能转移（detach）传入的 ArrayBuffer。留一份原始字节，
+          // 房主进入双人模式后要把它原样发给对手。
+          decoded = await decodeArrayBuffer(buf.slice(0), ctx)
         } catch (e) {
           throw new Error(describeDecodeError(e))
         }
@@ -191,7 +195,14 @@ export function App() {
           title: file.name.replace(/\.[^.]+$/, ''),
         })
 
-        setSong({ decoded, analysis, generated, fileName: file.name, drumHits })
+        setSong({
+          decoded,
+          analysis,
+          generated,
+          fileName: file.name,
+          sourceBytes: buf,
+          drumHits,
+        })
         setBattlePlay(null)
         navigate('game', 'PLAY')
       } catch (e) {
@@ -276,8 +287,6 @@ export function App() {
             onStart={handleStart}
             onUnlock={() => void unlockAudio()}
             error={error}
-            theme={settings.theme}
-            onThemeChange={(theme) => updateSettings({ theme })}
           />
         )}
 
@@ -305,7 +314,12 @@ export function App() {
             settings={settings}
             current={
               song
-                ? { chart: song.generated.chart, decoded: song.decoded, fileName: song.fileName }
+                ? {
+                    chart: song.generated.chart,
+                    decoded: song.decoded,
+                    fileName: song.fileName,
+                    sourceBytes: song.sourceBytes,
+                  }
                 : null
             }
             onStart={(payload) => {
