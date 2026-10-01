@@ -19,6 +19,8 @@ export type ClientMessage =
   | { t: 'PING'; cid: number; t0: number }
   | { t: 'CREATE_ROOM' }
   | { t: 'JOIN_ROOM'; roomCode: string }
+  /** 网络断开后恢复原座位，服务端按 token 校验。 */
+  | { t: 'REJOIN_ROOM'; roomCode: string; playerId: string; resumeToken: string }
   /** 房主提交谱面，服务端转发给对手。 */
   | { t: 'SUBMIT_CHART'; chart: Chart; fingerprint: string }
   /**
@@ -49,8 +51,15 @@ export type ServerMessage =
    * 两者之差就是服务端的处理耗时，需要从 RTT 里扣除。
    */
   | { t: 'PONG'; cid: number; t0: number; t1: number; t2: number }
-  | { t: 'ROOM_CREATED'; roomCode: string; playerId: string }
-  | { t: 'JOINED'; roomCode: string; playerId: string }
+  | { t: 'ROOM_CREATED'; roomCode: string; playerId: string; resumeToken: string }
+  | { t: 'JOINED'; roomCode: string; playerId: string; resumeToken: string }
+  | {
+      t: 'ROOM_RESUMED'
+      roomCode: string
+      playerId: string
+      isHost: boolean
+      opponentPresent: boolean
+    }
   | { t: 'PLAYER_JOINED'; playerId: string }
   | { t: 'PLAYER_LEFT'; playerId: string }
   | { t: 'ERROR'; message: string }

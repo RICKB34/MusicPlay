@@ -69,6 +69,7 @@ export function Lobby({ settings, current, onStart, onBack }: Props) {
   const [sending, setSending] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const startRef = useRef(onStart)
+  const handedOffRef = useRef(false)
   startRef.current = onStart
 
   // ── 建立连接 ──
@@ -79,7 +80,8 @@ export function Lobby({ settings, current, onStart, onBack }: Props) {
         if (s === 'open') {
           setStatus('已连接，创建或加入房间')
           setPhase((p) => (p === 'connect' ? 'menu' : p))
-        } else if (s === 'closed') setStatus('连接已断开')
+        } else if (s === 'reconnecting') setStatus('连接中断，正在自动重连…')
+        else if (s === 'closed') setStatus('连接已断开')
         else if (s === 'error') setError(detail ?? '连接失败')
       },
       onSynced: (ms) => setRtt(ms),
@@ -99,6 +101,20 @@ export function Lobby({ settings, current, onStart, onBack }: Props) {
         setPhase('waiting')
         setStatus('已加入房间，等待房主选择歌曲')
       },
+      onResumed: (host, opponent) => {
+        setIsHost(host)
+        isHostRef.current = host
+        setOpponentPresent(opponent)
+        setPhase((p) => (p === 'connect' || p === 'menu' ? 'waiting' : p))
+        setStatus(opponent ? '已恢复房间连接' : '已恢复房间，等待对手重连…')
+      },
+      onResumeFailed: (message) => {
+        setMyReady(false)
+        setOpponentReady(false)
+        setOpponentPresent(false)
+        setError(`${message}。请重新创建或加入房间。`)
+        setPhase('menu')
+      },
       onPlayerJoined: () => {
         setOpponentPresent(true)
         setStatus(
@@ -108,7 +124,7 @@ export function Lobby({ settings, current, onStart, onBack }: Props) {
       onPlayerLeft: () => {
         setOpponentPresent(false)
         setOpponentReady(false)
-        setStatus('对手已离开')
+        setStatus('对手连接中断，等待重连…')
       },
       onChart: (incoming, fp) => {
         setChart(incoming)
@@ -162,6 +178,7 @@ export function Lobby({ settings, current, onStart, onBack }: Props) {
         const d = decodedRef.current
         const client = clientRef.current
         if (c && d && client) {
+          handedOffRef.current = true
           startRef.current({
             chart: c,
             audioBuffer: d.buffer,
@@ -180,7 +197,8 @@ export function Lobby({ settings, current, onStart, onBack }: Props) {
     client.connect(defaultServerUrl())
 
     return () => {
-      client.dispose()
+      // 开局后连接所有权转交 GameScreen；这里若继续 dispose，会立刻断开对战。
+      if (!handedOffRef.current) client.dispose()
       clientRef.current = null
     }
   }, [])
@@ -291,7 +309,13 @@ export function Lobby({ settings, current, onStart, onBack }: Props) {
           <div className="stat">
             <div className="k">连接</div>
             <div className="v" style={{ fontSize: 15 }}>
-              {connState === 'open' ? '已连接' : connState === 'connecting' ? '连接中' : '未连接'}
+              {connState === 'open'
+                ? '已连接'
+                : connState === 'reconnecting'
+                  ? '重连中'
+                  : connState === 'connecting'
+                    ? '连接中'
+                    : '未连接'}
             </div>
           </div>
           <div className="stat">

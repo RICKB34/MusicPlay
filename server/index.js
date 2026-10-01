@@ -14,6 +14,7 @@
  */
 
 import { createServer } from 'node:http'
+import { randomBytes } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { extname, join, normalize } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -123,6 +124,8 @@ class Room {
     this.hostId = hostId
     /** @type {Map<string, import('ws').WebSocket>} */
     this.players = new Map()
+    /** @type {Map<string, string>} */
+    this.tokens = new Map()
     this.chart = null
     this.fingerprint = null
     /** @type {Buffer | null} */
@@ -222,7 +225,7 @@ function send(ws, msg) {
 }
 
 wss.on('connection', (ws) => {
-  const playerId = `P${nextPlayerSeq++}`
+  let playerId = `P${nextPlayerSeq++}`
   /** @type {Room | null} */
   let room = null
 
@@ -267,12 +270,17 @@ wss.on('connection', (ws) => {
     }
 
     if (msg.t === 'CREATE_ROOM') {
-      if (room) room.players.delete(playerId)
+      if (room) {
+        room.players.delete(playerId)
+        if (room.hostId === playerId) rooms.delete(room.code)
+      }
       const code = generateRoomCode()
+      const resumeToken = randomBytes(18).toString('base64url')
       room = new Room(code, playerId)
       room.players.set(playerId, ws)
+      room.tokens.set(playerId, resumeToken)
       rooms.set(code, room)
-      send(ws, { t: 'ROOM_CREATED', roomCode: code, playerId })
+      send(ws, { t: 'ROOM_CREATED', roomCode: code, playerId, resumeToken })
       console.log(`[room ${code}] 创建，房主 ${playerId}`)
       return
     }
@@ -290,9 +298,11 @@ wss.on('connection', (ws) => {
       }
       if (room) room.players.delete(playerId)
       room = target
+      const resumeToken = randomBytes(18).toString('base64url')
       room.players.set(playerId, ws)
+      room.tokens.set(playerId, resumeToken)
       room.touch()
-      send(ws, { t: 'JOINED', roomCode: code, playerId })
+      send(ws, { t: 'JOINED', roomCode: code, playerId, resumeToken })
       room.broadcast({ t: 'PLAYER_JOINED', playerId }, playerId)
       // 晚加入的玩家需要补收房间当前状态，否则房主已经选曲/准备时双方会卡住。
       if (room.chart) {
@@ -303,6 +313,57 @@ wss.on('connection', (ws) => {
         send(ws, { t: 'OPPONENT_READY', ready: true })
       }
       console.log(`[room ${code}] ${playerId} 加入（${room.players.size}/2）`)
+      return
+    }
+
+    if (msg.t === 'REJOIN_ROOM') {
+      const code = String(msg.roomCode ?? '').toUpperCase()
+      const resumedPlayerId = String(msg.playerId ?? '')
+      const resumeToken = String(msg.resumeToken ?? '')
+      const target = rooms.get(code)
+      if (!target || target.tokens.get(resumedPlayerId) !== resumeToken) {
+        send(ws, { t: 'ERROR', message: '原房间已失效，请重新创建或加入房间' })
+        return
+      }
+
+      if (room && room !== target) room.players.delete(playerId)
+      const previous = target.players.get(resumedPlayerId)
+      playerId = resumedPlayerId
+      room = target
+      room.players.set(playerId, ws)
+      room.touch()
+
+      // 旧连接若还开着，替换后直接关闭；close 处理器会校验 ws 身份，不会误删新连接。
+      if (previous && previous !== ws) {
+        try {
+          previous.close(4001, 'reconnected')
+        } catch {
+          // 忽略
+        }
+      }
+
+      const opponentId = [...room.players.keys()].find((id) => id !== playerId) ?? null
+      send(ws, {
+        t: 'ROOM_RESUMED',
+        roomCode: code,
+        playerId,
+        isHost: playerId === room.hostId,
+        opponentPresent: opponentId !== null,
+      })
+      if (room.chart) {
+        send(ws, { t: 'CHART_RECEIVED', chart: room.chart, fingerprint: room.fingerprint })
+      }
+      if (playerId !== room.hostId && room.audioComplete) {
+        room.sendAudioTo(playerId)
+      }
+      if (opponentId) {
+        room.sendTo(opponentId, { t: 'PLAYER_JOINED', playerId })
+        room.sendTo(playerId, {
+          t: 'OPPONENT_READY',
+          ready: room.ready.has(opponentId),
+        })
+      }
+      console.log(`[room ${code}] ${playerId} 已重连`)
       return
     }
 
@@ -419,13 +480,15 @@ wss.on('connection', (ws) => {
 
   ws.on('close', () => {
     if (!room) return
+    // 同一座位的新连接已经顶上时，旧连接关闭不能删掉新连接。
+    if (room.players.get(playerId) !== ws) return
     room.players.delete(playerId)
     room.ready.delete(playerId)
     room.broadcast({ t: 'PLAYER_LEFT', playerId })
     // 对手掉线不中断本局——本地继续打完并记录成绩
     if (room.players.size === 0) {
-      rooms.delete(room.code)
-      console.log(`[room ${room.code}] 空房间已回收`)
+      // 保留空房间一个 TTL，给双方短暂断网自动重连的机会。
+      console.log(`[room ${room.code}] 暂时无人，等待重连`)
     }
   })
 })

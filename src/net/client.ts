@@ -13,12 +13,20 @@ import { deserializeChart } from '../chartgen/serialize'
 import { ClockSync, localNowMs } from './sync'
 import { MAX_BATTLE_AUDIO_BYTES, type ClientMessage, type ServerMessage } from './protocol'
 
-export type ConnectionState = 'idle' | 'connecting' | 'open' | 'closed' | 'error'
+export type ConnectionState =
+  | 'idle'
+  | 'connecting'
+  | 'reconnecting'
+  | 'open'
+  | 'closed'
+  | 'error'
 
 export interface BattleCallbacks {
   onState?: (state: ConnectionState, detail?: string) => void
   onRoomCreated?: (roomCode: string, playerId: string) => void
   onJoined?: (roomCode: string, playerId: string) => void
+  onResumed?: (isHost: boolean, opponentPresent: boolean) => void
+  onResumeFailed?: (message: string) => void
   onPlayerJoined?: (playerId: string) => void
   onPlayerLeft?: (playerId: string) => void
   onChart?: (chart: Chart, fingerprint: string) => void
@@ -55,7 +63,8 @@ export function defaultServerUrl(): string {
 
   const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
   const host = window.location.hostname || 'localhost'
-  if (window.location.port === '5173' || window.location.port === '4173') {
+  // Vite 端口被占用时会自动顺延到 5174/5175…，开发模式下统一回落到 8787。
+  if (import.meta.env.DEV || window.location.port === '4173') {
     return `${proto}//${host}:8787`
   }
   if (window.location.host) return `${proto}//${window.location.host}`
@@ -70,6 +79,12 @@ export class BattleClient {
   private keepAliveTimer: ReturnType<typeof setInterval> | null = null
   private quickSyncRemaining = 0
   private disposed = false
+  private shouldReconnect = false
+  private connectUrl = ''
+  private reconnectAttempt = 0
+  private reconnectTimer: number | null = null
+  private resumeToken: string | null = null
+  private resumePending = false
   private audioUploadWaiter: {
     resolve: () => void
     reject: (error: Error) => void
@@ -115,20 +130,30 @@ export class BattleClient {
 
   connect(url = defaultServerUrl()): void {
     if (this.disposed) return
-    this.close()
+    this.shouldReconnect = true
+    this.connectUrl = url
+    this.reconnectAttempt = 0
+    this.clearReconnectTimer()
+    this.openSocket(url)
+  }
 
+  private openSocket(url: string): void {
+    this.stopTimers()
+    this.closeSocket()
     this.cb.onState?.('connecting', url)
     let ws: WebSocket
     try {
       ws = new WebSocket(url)
     } catch (e) {
       this.cb.onState?.('error', (e as Error).message)
+      this.scheduleReconnect()
       return
     }
     this.ws = ws
     ws.binaryType = 'arraybuffer'
 
     ws.onopen = () => {
+      this.reconnectAttempt = 0
       this.cb.onState?.('open', url)
       // 密集打点快速收敛时钟
       this.quickSyncRemaining = 8
@@ -136,12 +161,28 @@ export class BattleClient {
       this.pingTimer = setInterval(() => this.ping(), 150)
       // 收敛后转为低频跟踪
       this.keepAliveTimer = setInterval(() => this.ping(), 10_000)
+      if (this.roomCode && this.playerId && this.resumeToken) {
+        this.resumePending = true
+        this.send({
+          t: 'REJOIN_ROOM',
+          roomCode: this.roomCode,
+          playerId: this.playerId,
+          resumeToken: this.resumeToken,
+        })
+      }
     }
 
     ws.onclose = () => {
-      this.cb.onState?.('closed')
+      if (this.ws !== ws) return
+      this.ws = null
       this.stopTimers()
       this.rejectAudioUpload(new Error('连接已断开，音频发送失败'))
+      if (this.shouldReconnect) {
+        this.cb.onState?.('reconnecting')
+        this.scheduleReconnect()
+      } else {
+        this.cb.onState?.('closed')
+      }
     }
 
     ws.onerror = () => {
@@ -168,6 +209,23 @@ export class BattleClient {
         return
       }
       this.dispatch(msg)
+    }
+  }
+
+  private scheduleReconnect(): void {
+    if (!this.shouldReconnect || this.reconnectTimer !== null) return
+    const delay = Math.min(10_000, 800 * 2 ** this.reconnectAttempt)
+    this.reconnectAttempt++
+    this.reconnectTimer = window.setTimeout(() => {
+      this.reconnectTimer = null
+      if (this.shouldReconnect && !this.disposed) this.openSocket(this.connectUrl)
+    }, delay)
+  }
+
+  private clearReconnectTimer(): void {
+    if (this.reconnectTimer !== null) {
+      window.clearTimeout(this.reconnectTimer)
+      this.reconnectTimer = null
     }
   }
 
@@ -211,12 +269,22 @@ export class BattleClient {
       case 'ROOM_CREATED':
         this.playerId = msg.playerId
         this.roomCode = msg.roomCode
+        this.resumeToken = msg.resumeToken
+        this.resumePending = false
         this.cb.onRoomCreated?.(msg.roomCode, msg.playerId)
         break
       case 'JOINED':
         this.playerId = msg.playerId
         this.roomCode = msg.roomCode
+        this.resumeToken = msg.resumeToken
+        this.resumePending = false
         this.cb.onJoined?.(msg.roomCode, msg.playerId)
+        break
+      case 'ROOM_RESUMED':
+        this.playerId = msg.playerId
+        this.roomCode = msg.roomCode
+        this.resumePending = false
+        this.cb.onResumed?.(msg.isHost, msg.opponentPresent)
         break
       case 'PLAYER_JOINED':
         this.cb.onPlayerJoined?.(msg.playerId)
@@ -280,6 +348,13 @@ export class BattleClient {
         break
       case 'ERROR':
         this.rejectAudioUpload(new Error(msg.message))
+        if (this.resumePending) {
+          this.resumePending = false
+          this.roomCode = null
+          this.playerId = null
+          this.resumeToken = null
+          this.cb.onResumeFailed?.(msg.message)
+        }
         this.cb.onError?.(msg.message)
         break
     }
@@ -335,10 +410,12 @@ export class BattleClient {
   }
 
   createRoom(): void {
+    this.resumePending = false
     this.send({ t: 'CREATE_ROOM' })
   }
 
   joinRoom(code: string): void {
+    this.resumePending = false
     this.send({ t: 'JOIN_ROOM', roomCode: code.toUpperCase() })
   }
 
@@ -423,6 +500,9 @@ export class BattleClient {
   leave(): void {
     this.send({ t: 'LEAVE' })
     this.roomCode = null
+    this.playerId = null
+    this.resumeToken = null
+    this.resumePending = false
   }
 
   private stopTimers(): void {
@@ -433,22 +513,29 @@ export class BattleClient {
   }
 
   close(): void {
+    this.shouldReconnect = false
+    this.clearReconnectTimer()
     this.stopTimers()
     this.rejectAudioUpload(new Error('连接已关闭'))
     this.incomingAudio = null
-    if (this.ws) {
-      this.ws.onopen = null
-      this.ws.onclose = null
-      this.ws.onerror = null
-      this.ws.onmessage = null
+    this.closeSocket()
+    this.sync.reset()
+  }
+
+  private closeSocket(): void {
+    const ws = this.ws
+    if (ws) {
+      ws.onopen = null
+      ws.onclose = null
+      ws.onerror = null
+      ws.onmessage = null
       try {
-        this.ws.close()
+        ws.close()
       } catch {
         // 忽略
       }
       this.ws = null
     }
-    this.sync.reset()
   }
 
   dispose(): void {

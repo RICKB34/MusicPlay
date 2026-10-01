@@ -93,7 +93,7 @@ async function main() {
   console.log(`\n对战服务冒烟测试 → ${URL}\n`)
 
   const host = makePlayer('房主')
-  const guest = makePlayer('对手')
+  let guest = makePlayer('对手')
   await Promise.all([host.open(), guest.open()])
   check('两个客户端都能连上服务器', true)
 
@@ -169,6 +169,26 @@ async function main() {
     audioBegin.size === audio.byteLength && guestAudio.equals(audio),
     `${guestAudio.byteLength} bytes`,
   )
+
+  // ── 断线重连：短暂断网后恢复原座位，而不是变成第三个玩家 ──
+  const resumeLeftPromise = host.waitFor((m) => m.t === 'PLAYER_LEFT', '对手断开')
+  guest.close()
+  await resumeLeftPromise
+  const resumed = makePlayer('重连后的对手')
+  await resumed.open()
+  resumed.send({
+    t: 'REJOIN_ROOM',
+    roomCode: created.roomCode,
+    playerId: joined.playerId,
+    resumeToken: joined.resumeToken,
+  })
+  const resumedAck = await resumed.waitFor((m) => m.t === 'ROOM_RESUMED', 'ROOM_RESUMED')
+  await host.waitFor((m) => m.t === 'PLAYER_JOINED', '对手重连')
+  check(
+    '对手能回到原房间和原座位',
+    resumedAck.playerId === joined.playerId && resumedAck.isHost === false,
+  )
+  guest = resumed
 
   // ── 双方准备 → 权威时间轴 ──
   const startAtPromise = Promise.all([
