@@ -68,6 +68,7 @@ export function Lobby({ settings, current, onStart, onBack }: Props) {
   const [audioBytes, setAudioBytes] = useState<ArrayBuffer | null>(null)
   const [myReady, setMyReady] = useState(false)
   const [sending, setSending] = useState(false)
+  const myReadyRef = useRef(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const startRef = useRef(onStart)
   const handedOffRef = useRef(false)
@@ -107,10 +108,22 @@ export function Lobby({ settings, current, onStart, onBack }: Props) {
         isHostRef.current = host
         setOpponentPresent(opponent)
         setPhase((p) => (p === 'connect' || p === 'menu' ? 'waiting' : p))
-        setStatus(opponent ? '已恢复房间连接' : '已恢复房间，等待对手重连…')
+        // 断线时服务端会清掉 READY；如果玩家断线前已经点过准备，
+        // 重连后要自动补发，否则双方会一直卡在"我准备了、对方没准备"。
+        if (myReadyRef.current) clientRef.current?.setReady(true)
+        setStatus(
+          opponent
+            ? myReadyRef.current
+              ? '已恢复连接，准备状态已同步'
+              : chartRef.current
+                ? '已恢复连接，可以准备'
+                : '已恢复房间，等待房主选择歌曲'
+            : '已恢复房间，等待对手重连…',
+        )
       },
       onResumeFailed: (message) => {
         setMyReady(false)
+        myReadyRef.current = false
         setOpponentReady(false)
         setOpponentPresent(false)
         setError(`${message}。请重新创建或加入房间。`)
@@ -119,7 +132,13 @@ export function Lobby({ settings, current, onStart, onBack }: Props) {
       onPlayerJoined: () => {
         setOpponentPresent(true)
         setStatus(
-          isHostRef.current ? '对手已加入，请选择歌曲' : '已加入房间，等待房主选择歌曲',
+          isHostRef.current
+            ? chartRef.current
+              ? '对手已连接，可以准备'
+              : '对手已加入，请选择歌曲'
+            : decodedRef.current
+              ? '对手已连接，可以准备'
+              : '已加入房间，等待房主选择歌曲',
         )
       },
       onPlayerLeft: () => {
@@ -131,7 +150,13 @@ export function Lobby({ settings, current, onStart, onBack }: Props) {
         setChart(incoming)
         setFingerprint(fp)
         // 房主只收到服务器回执；加入者随后会自动收到原始音频。
-        setStatus(isHostRef.current ? '谱面已发送' : '已收到歌曲信息，正在接收音频…')
+        setStatus(
+          isHostRef.current
+            ? '谱面已发送'
+            : decodedRef.current
+              ? '歌曲已收到，点击「准备」加入对战'
+              : '已收到歌曲信息，正在接收音频…',
+        )
       },
       onAudio: (audio, fp, sourceId, fileName) => {
         if (isHostRef.current) return
@@ -289,6 +314,7 @@ export function Lobby({ settings, current, onStart, onBack }: Props) {
 
     client.setReady(true)
     setMyReady(true)
+    myReadyRef.current = true
     setStatus('已准备，等待对手…')
   }, [audioBytes, chart, decoded, fingerprint, isHost, sending])
 
