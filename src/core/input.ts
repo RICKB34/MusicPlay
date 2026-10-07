@@ -13,34 +13,22 @@
  *    代码路径唯一。`pointercancel` 也必须处理，否则手指滑出元素后
  *    该轨道会永远卡在"按下"状态。
  *
- * 键位选 D F J K（4K）/ S D F J K L（6K）：跨越键盘左右两区，
- * 规避廉价薄膜键盘的按键冲突（鬼键）。演示机不一定有无冲键盘。
+ * 默认键位选 D F J K（4K）/ S D F J K L（6K）：跨越键盘左右两区，
+ * 规避廉价薄膜键盘的按键冲突（鬼键）。玩家可以在设置里逐轨改键。
  */
+
+import { buildKeymap, DEFAULT_KEY_BINDINGS } from './keymap'
 
 export type LaneHandler = (lane: number, songTimeSec: number) => void
 
 export interface InputOptions {
   columns: 4 | 6
+  /** 每轨的 KeyboardEvent.code。不传或长度不匹配时使用默认键位。 */
+  keyBindings?: readonly string[]
   /** 读取当前歌曲时刻（秒）。判定就在输入回调里同步用它。 */
   getSongTime: () => number
   onLaneDown: LaneHandler
   onLaneUp?: LaneHandler
-}
-
-const KEYMAP_4K: Record<string, number> = {
-  KeyD: 0,
-  KeyF: 1,
-  KeyJ: 2,
-  KeyK: 3,
-}
-
-const KEYMAP_6K: Record<string, number> = {
-  KeyS: 0,
-  KeyD: 1,
-  KeyF: 2,
-  KeyJ: 3,
-  KeyK: 4,
-  KeyL: 5,
 }
 
 export class InputManager {
@@ -59,7 +47,10 @@ export class InputManager {
   constructor(el: HTMLElement, opts: InputOptions) {
     this.el = el
     this.opts = opts
-    this.keymap = opts.columns === 6 ? KEYMAP_6K : KEYMAP_4K
+    const keys = opts.keyBindings?.length === opts.columns
+      ? opts.keyBindings
+      : DEFAULT_KEY_BINDINGS[opts.columns]
+    this.keymap = buildKeymap(keys)
     this.lanePressed = new Array(opts.columns).fill(false)
 
     el.style.touchAction = 'none'
@@ -180,9 +171,4 @@ export class InputManager {
     }
     this.heldKeys.clear()
   }
-}
-
-/** 键位提示文案，显示在设置页与游戏内。 */
-export function keyHint(columns: 4 | 6): string {
-  return columns === 6 ? 'S D F  J K L' : 'D F  J K'
 }

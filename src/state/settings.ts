@@ -6,6 +6,7 @@
  */
 
 import type { Difficulty } from '../types'
+import { cloneKeyBindings, normalizeKeyBindings, type KeyBindings } from '../core/keymap'
 import { DEFAULT_THEME_KEY, normalizeThemeKey, type ThemeKey } from './theme'
 
 export interface Settings {
@@ -19,6 +20,8 @@ export interface Settings {
   difficulty: Difficulty
   /** 是否显示判定偏差数值（调试用）。 */
   showDelta: boolean
+  /** 4K / 6K 各自保存一套物理键位，值为 KeyboardEvent.code。 */
+  keyBindings: KeyBindings
   /** 分析档位。移动端卡顿时降到 fast 或 demo。 */
   analysisProfile: 'fast' | 'balanced' | 'precise' | 'demo'
   /**
@@ -34,6 +37,7 @@ export const DEFAULT_SETTINGS: Settings = {
   columns: 4,
   difficulty: 'normal',
   showDelta: false,
+  keyBindings: cloneKeyBindings(),
   analysisProfile: 'balanced',
   theme: DEFAULT_THEME_KEY,
 }
@@ -55,7 +59,7 @@ const KEY = 'rhythm-forge:settings:v1'
 export function loadSettings(): Settings {
   try {
     const raw = localStorage.getItem(KEY)
-    if (!raw) return { ...DEFAULT_SETTINGS }
+    if (!raw) return { ...DEFAULT_SETTINGS, keyBindings: cloneKeyBindings(DEFAULT_SETTINGS.keyBindings) }
     const parsed = JSON.parse(raw) as Partial<Settings> & { chartSource?: unknown }
     delete parsed.chartSource
     // 逐字段回落，避免旧版本存档缺字段导致 undefined 扩散。
@@ -65,10 +69,11 @@ export function loadSettings(): Settings {
       ...DEFAULT_SETTINGS,
       ...parsed,
       approachMs: normalizeApproachMs(parsed.approachMs),
+      keyBindings: normalizeKeyBindings(parsed.keyBindings),
       theme: normalizeThemeKey(parsed.theme),
     }
   } catch {
-    return { ...DEFAULT_SETTINGS }
+    return { ...DEFAULT_SETTINGS, keyBindings: cloneKeyBindings(DEFAULT_SETTINGS.keyBindings) }
   }
 }
 

@@ -92,6 +92,7 @@ export function GameScreen({
       userOffsetSec: settings.userOffsetMs / 1000,
       leadSec,
       showDelta: settings.showDelta,
+      keyBindings: settings.keyBindings[chart.columns],
       // 主题只在挂载时读一次。依赖数组恒为空是刻意的——把 settings.theme 加进去
       // 会在切主题时重挂载游戏，音频图重连、当前这局直接报废。
       theme: renderThemeOf(settings.theme),
