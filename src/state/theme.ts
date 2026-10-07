@@ -4,7 +4,7 @@
  * 六套主题：
  *   - qq    ：QQ 音乐风格（默认），白底 + 品牌绿 #31c27c，简约
  *   - acid  ：赛博风格（Acid Graphics），纯黑底 + 荧光色 + 直角硬阴影
- *   - clay  ：粘土拟态（Claymorphism），奶油粉底 + 超大圆角 + 内外阴影组合
+ *   - shoujo：少女漫画（Shoujo Manga），珍珠白底 + 樱花粉 + 网点纹理与缎带装饰
  *   - vapor ：霓虹复古（Vaporwave），深紫底 + 粉青双色霓虹 + 网格线
  *   - pixel ：像素艺术风（Pixel Art），PICO-8 调色板 + 4px 粗边框 + 硬边阴影
  *   - ink   ：水墨画风（Ink Wash），宣纸底 + 墨色 + 细边框 + 大留白
@@ -13,24 +13,28 @@
  * canvas 那半边需要真实颜色值，拿不到 CSS 变量（每帧读 getComputedStyle 会强制
  * 样式重算），所以在这里用 JS 对象提供。两边是一对，改色时**要一起改**。
  *
- * 加一套主题要动四处，缺一处就是半个主题：
+ * 加一套主题要动三处，缺一处就是半个主题：
  *   1. 这里（key / label / 说明 / 色卡 / 状态栏色）
  *   2. `core/render.ts` 的 RenderTheme 对象
  *   3. `styles.css` 的主题块（变量名要**逐一**配齐，见 theme.test.ts）
- *   4. 无——`normalizeThemeKey` 按 THEMES 自动收敛，不用改
+ *
+ * 可选的第四处：`core/render.ts` 里写一段 accent 挂到 `RenderTheme.effects`，
+ * 让打击特效也带上这套主题的辨识度。不写就是基准画法（QQ 那套）。
+ *
+ * `normalizeThemeKey` 按 THEMES 自动收敛，不用改。
  */
 
 import {
   ACID_THEME,
-  CLAY_THEME,
   INK_THEME,
   PIXEL_THEME,
   QQ_THEME,
+  SHOUJO_THEME,
   VAPORWAVE_THEME,
   type RenderTheme,
 } from '../core/render'
 
-export type ThemeKey = 'qq' | 'acid' | 'clay' | 'vapor' | 'pixel' | 'ink'
+export type ThemeKey = 'qq' | 'acid' | 'shoujo' | 'vapor' | 'pixel' | 'ink'
 
 export interface ThemeDef {
   key: ThemeKey
@@ -66,12 +70,12 @@ export const THEMES: readonly ThemeDef[] = [
     render: ACID_THEME,
   },
   {
-    key: 'clay',
-    label: '粘土拟态',
-    description: '奶油粉底 + 超大圆角，内外阴影堆出软糯的 3D 立体感。',
-    swatch: ['#fce7f3', '#f472b6', '#fde68a'],
-    statusBar: '#fce7f3',
-    render: CLAY_THEME,
+    key: 'shoujo',
+    label: '少女漫画',
+    description: '樱花粉 + 珍珠白，网点纹理与缎带装饰的梦幻少女漫画风。',
+    swatch: ['#fff5f7', '#ffb7c5', '#c4b5fd'],
+    statusBar: '#fff5f7',
+    render: SHOUJO_THEME,
   },
   {
     key: 'vapor',
