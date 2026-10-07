@@ -343,7 +343,10 @@ export class RhythmGame {
     // 鼓点反馈：推进游标 + 衰减光晕。只做氛围，完全不碰判定与计分。
     this.advanceDrums(songTime)
 
-    // 清理过期特效
+    // 清理过期特效。
+    // 这里用的是**全局保留上限**（所有主题里该判定的最长寿命），不是当前主题的
+    // 真实寿命——引擎不认识主题。真寿命由 renderer 按主题自行裁剪，所以这里刻意
+    // 留得比实际长一点：少留会让特效提前消失，而且不会有任何报错。
     if (this.effects.length > 0) {
       this.effects = this.effects.filter(
         (fx) => songTime - fx.startSec < hitEffectLifeSec(fx.judgment),

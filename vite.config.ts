@@ -24,7 +24,9 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,woff2}'],
+        // png 是打击特效的贴图（src/assets/effects）。漏了它，离线时特效会在
+        // 无声无息中消失——加载失败没有报错，只是画不出来。
+        globPatterns: ['**/*.{js,css,html,svg,woff2,png}'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
       },
       devOptions: { enabled: false },

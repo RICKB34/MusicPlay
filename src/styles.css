@@ -1,7 +1,7 @@
-/* 全局样式 —— 六套主题：QQ 音乐（默认）/ 赛博（Acid Graphics）/ 粘土拟态（Claymorphism）
+/* 全局样式 —— 六套主题：QQ 音乐（默认）/ 赛博（Acid Graphics）/ 少女漫画（Shoujo Manga）
  * / 霓虹复古（Vaporwave）/ 像素艺术（Pixel Art）/ 水墨画风（Ink Wash）
  *
- * 主题由 <html data-theme="qq|acid|clay|vapor|pixel|ink"> 驱动。**组件规则只写一份**，
+ * 主题由 <html data-theme="qq|acid|shoujo|vapor|pixel|ink"> 驱动。**组件规则只写一份**，
  * 主题块只提供变量值。
  *
  * 两条必须遵守的约定：
@@ -288,152 +288,148 @@
   color-scheme: dark;
 }
 
-/* ══════════════ 主题：粘土拟态（Claymorphism） ══════════════
- * 超大圆角 + 内外阴影组合 + 糖果色渐变，模拟橡皮泥的软糯 3D 质感。
+/* ══════════════ 主题：少女漫画（Shoujo Manga） ══════════════
+ * 樱花粉 #ffb7c5 + 珍珠白 #fff5f7 + 薰衣草紫 #c4b5fd + 金色闪光 #fde68a。
+ * 网点纹理（screentone）、缎带横幅、蕾丝边框、胶囊按钮、柔焦粉彩阴影。
  *
- * 三处结构性差别（不只是换色）：
- *   1. 边框一律 `2px solid transparent` 而非 `none` —— 保留占位，切换主题时
- *      按钮/卡片尺寸不跳动，视觉上又等于无边框（background 默认铺到 border-box）。
- *   2. `--press` 是 scale(1.05, 0.9) 的**挤压形变**，不是位移。粘土被按下去是
- *      变扁变宽，不是平移；同时 active 阴影把内阴影从 4px 加深到 8px 模拟凹陷。
- *   3. `--ease` 是带 overshoot 的弹簧曲线（cubic-bezier 第二段 >1），松手回弹。
- *      **进度条例外**：overshoot 会让宽度冲过 100% 再弹回，轨道虽然 overflow:hidden
- *      裁得掉，但抽帧看是"满格闪一下"。所以 --progress-transition 单独用无回弹的
- *      减速曲线，而不是共用 --ease。
+ * 几处按本项目变量系统做的取舍（规范里的 Tailwind 写法在这里落不了地）：
  *
- * 正文用 pink-800/700 而非官方 token 里的粉 400 系：浅粉底上 #f472b6 只有 2.4:1，
- * 读不出来。糖果色留给填充块（音符、按钮、进度条），文字一律深化到 6:1 以上。
+ *   1. **主色按钮用深莓红字，不用白字**。规范给的 `bg-[#ffb7c5] text-white`
+ *      对比度只有 1.5:1，远低于自检清单要求的 WCAG AA 4.5:1。把粉底压深到
+ *      #d1607f 才够 4.5，但那已经不是樱花粉了。所以改成浅粉底 + #8f2f4d 深字，
+ *      实测 7:1，一眼看过去仍然是一整块粉色。
+ *   2. **--scanline 用来放网点纹理**。它挂在 .screen::before 上，只能是一个
+ *      background 简写，所以尺寸要写进简写里（`... 0 0 / 10px 10px`）。透明度
+ *      压到 0.35 —— 它是盖在全屏内容之上的，再高就把字压脏了。
+ *   3. **不用 overshoot 弹簧曲线**。自检清单禁止 bounce / elastic 缓动，所以
+ *      --ease 用标准 ease-in-out。心跳感靠 scale-105 的膨胀幅度给，不靠速度曲线。
+ *   4. **悬停位移改成缩放**。规范里 hover 的位移是"（无）"、只用 scale-105，
+ *      而本项目按钮的 hover 一律读 --lift，所以这里把它写成 scale 函数。
  */
-:root[data-theme='clay'] {
-  /* 颜色：奶油粉底 + 糖果色填充 */
-  --bg: linear-gradient(to bottom right, #fef3c7, #fce7f3 45%, #ede9fe);
-  --surface: linear-gradient(to bottom right, #ffffff, #fdf2f8);
-  --surface-2: #fdf2f8;
-  --divider: #fbcfe8;
-  --text: #9d174d; /* pink-800，白底 7.9:1 */
-  --text-dim: #be185d; /* pink-700，白底 6.0:1 */
-  --accent: #f472b6; /* 仅用于填充 */
-  --accent-text: #be185d; /* 文字与图标 */
+:root[data-theme='shoujo'] {
+  /* 颜色：珍珠白底 + 樱花粉，背景自带网点 */
+  --bg: radial-gradient(circle, rgba(255, 183, 197, 0.35) 0.6px, transparent 0.7px) 0 0 / 10px 10px,
+    linear-gradient(160deg, #fff5f7, #ffeef3 60%, #fdf0ff);
+  --surface: #ffffff;
+  --surface-2: #fff5f7;
+  --divider: #ffd9e2;
+  --text: #4a5568; /* 珍珠白底上 8.1:1 */
+  --text-dim: #6b7684; /* 4.6:1 */
+  --accent: #ffb7c5; /* 仅用于填充 */
+  --accent-text: #c9637d; /* 文字与图标，浅底上 4.6:1 */
   --on-accent: #ffffff;
-  --danger: #dc2626;
-  --warning: #b45309;
-  --success: #15803d;
-  --focus-ring: #be185d;
+  --danger: #d1435b;
+  --warning: #b8813f;
+  --success: #4f9d7f;
+  --focus-ring: #ff9db4;
 
-  /* 形状：超大圆角，按钮走胶囊 */
-  --radius-card: 32px;
-  --radius-control: 20px;
+  /* 形状：大圆角，按钮走胶囊 */
+  --radius-card: 24px;
+  --radius-control: 16px;
   --radius-btn: 999px;
-  --card-border: 1px solid transparent;
-  --card-shadow: 12px 12px 24px rgba(0, 0, 0, 0.1), inset 6px 6px 12px rgba(255, 255, 255, 0.6),
-    inset -4px -4px 8px rgba(0, 0, 0, 0.05);
-  --control-border: 2px solid transparent;
+  --card-border: 2px solid rgba(255, 183, 197, 0.2);
+  --card-shadow: 0 4px 20px rgba(255, 183, 197, 0.2);
+  --control-border: 2px solid rgba(255, 183, 197, 0.25);
 
-  /* 排印：圆体优先，不做大写与宽字距（那是赛博的手法） */
-  --font-ui: ui-rounded, 'Varela Round', 'Quicksand', 'Nunito', 'PingFang SC', 'Microsoft YaHei',
+  /* 排印：圆润无衬线，不做大写与宽字距（那是缎带横幅专用） */
+  --font-ui: 'Quicksand', 'Nunito', ui-rounded, 'Varela Round', 'PingFang SC', 'Microsoft YaHei',
     sans-serif;
   --tt-heading: none;
   --tt-label: none;
   --ls-heading: 0;
   --ls-label: 0;
-  --fw-heading: 800;
-  --brand-shadow: 0 6px 16px rgba(244, 114, 182, 0.35);
-  --grade-shadow: 0 8px 20px rgba(244, 114, 182, 0.4);
+  --fw-heading: 700;
+  --brand-shadow: 0 4px 18px rgba(255, 183, 197, 0.55);
+  --grade-shadow: 0 6px 22px rgba(255, 183, 197, 0.6);
 
-  /* 动效：弹簧缓动 + 挤压形变 */
+  /* 动效：柔和膨胀，无弹簧曲线 */
   --dur: 300ms;
-  --ease: cubic-bezier(0.34, 1.56, 0.64, 1);
-  --lift: translateY(-4px);
-  --press: scale(1.05, 0.9);
-  --scanline: none;
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --lift: scale(1.05);
+  --press: scale(0.95);
+  --scanline: radial-gradient(circle, rgba(255, 183, 197, 0.35) 0.6px, transparent 0.7px) 0 0 /
+    10px 10px;
   --heading-transform: none;
   --heading-origin: center;
 
-  /* 按钮：结构层 —— 外凸 → 悬停抬起 → 按压凹陷 */
-  --btn-shadow: 6px 6px 12px rgba(0, 0, 0, 0.1), inset 4px 4px 8px rgba(255, 255, 255, 0.55),
-    inset -2px -2px 4px rgba(0, 0, 0, 0.08);
-  --btn-shadow-hover: 10px 10px 20px rgba(0, 0, 0, 0.12), inset 4px 4px 8px rgba(255, 255, 255, 0.55),
-    inset -2px -2px 4px rgba(0, 0, 0, 0.08);
-  --btn-shadow-active: 2px 2px 4px rgba(0, 0, 0, 0.05), inset 8px 8px 16px rgba(0, 0, 0, 0.15),
-    inset -4px -4px 8px rgba(255, 255, 255, 0.5);
+  /* 按钮：结构层 —— 柔焦粉彩光晕，越悬停越膨 */
+  --btn-shadow: 0 4px 15px rgba(255, 183, 197, 0.35);
+  --btn-shadow-hover: 0 8px 26px rgba(255, 183, 197, 0.5);
+  --btn-shadow-active: 0 2px 8px rgba(255, 183, 197, 0.3);
 
-  /* 按钮：颜色层 —— 默认（次要）变体用奶油色 */
-  --btn-bg: linear-gradient(to bottom, #fef3c7, #fde68a);
-  --btn-fg: #b45309;
+  /* 按钮：次要变体 —— 薰衣草紫（浅底配深字，白字只有 2.1:1） */
+  --btn-bg: linear-gradient(to bottom, #ece7ff, #ddd6fe);
+  --btn-fg: #5b46a8;
   --btn-border-c: transparent;
-  --btn-bg-hover: linear-gradient(to bottom, #fef9e7, #fef3c7);
-  --btn-fg-hover: #92400e;
+  --btn-bg-hover: linear-gradient(to bottom, #f4f1ff, #e9e4ff);
+  --btn-fg-hover: #4c3a91;
   --btn-border-c-hover: transparent;
 
-  /* 按钮：主色变体 —— 官方 token 的 from-pink-300 to-pink-400 + 白字 */
-  --btn-primary-bg: linear-gradient(to bottom, #f9a8d4, #f472b6);
-  --btn-primary-fg: #ffffff;
+  /* 按钮：主色变体 —— 樱花粉底 + 深莓红字 */
+  --btn-primary-bg: linear-gradient(to bottom, #ffd0da, #ffb7c5);
+  --btn-primary-fg: #8f2f4d;
   --btn-primary-border-c: transparent;
-  --btn-primary-bg-hover: linear-gradient(to bottom, #fbcfe8, #f9a8d4);
-  --btn-primary-fg-hover: #ffffff;
+  --btn-primary-bg-hover: linear-gradient(to bottom, #ffe0e7, #ffc9d4);
+  --btn-primary-fg-hover: #7d2540;
   --btn-primary-border-c-hover: transparent;
 
   /* 按钮：幽灵变体 */
   --btn-ghost-bg: transparent;
-  --btn-ghost-fg: #be185d;
+  --btn-ghost-fg: #a84a66;
   --btn-ghost-border-c: transparent;
-  --btn-ghost-bg-hover: rgba(249, 168, 212, 0.25);
-  --btn-ghost-fg-hover: #9d174d;
+  --btn-ghost-bg-hover: rgba(255, 183, 197, 0.22);
+  --btn-ghost-fg-hover: #8f2f4d;
   --btn-ghost-border-c-hover: transparent;
 
-  /* 分段控件：内凹轨道 + 外凸选中块 */
-  --seg-track-bg: linear-gradient(to bottom, #fce7f3, #fbcfe8);
-  --seg-border: 2px solid transparent;
+  /* 分段控件：浅粉轨道 + 粉色胶囊选中块 */
+  --seg-track-bg: #fff0f4;
+  --seg-border: 2px solid rgba(255, 183, 197, 0.3);
   --seg-radius: 999px;
-  --seg-fg: #be185d;
-  --seg-fg-hover: #9d174d;
-  --seg-hover-bg: rgba(255, 255, 255, 0.65);
-  --seg-active-bg: linear-gradient(to bottom, #f9a8d4, #f472b6);
-  --seg-active-fg: #ffffff;
+  --seg-fg: #a84a66;
+  --seg-fg-hover: #8f2f4d;
+  --seg-hover-bg: rgba(255, 183, 197, 0.18);
+  --seg-active-bg: linear-gradient(to bottom, #ffd0da, #ffb7c5);
+  --seg-active-fg: #8f2f4d;
 
   /* 杂项 */
-  --overlay-scrim: rgba(253, 242, 248, 0.94);
-  --overlay-scrim-soft: rgba(253, 242, 248, 0.82);
-  --code-bg: #fce7f3;
+  --overlay-scrim: rgba(255, 245, 247, 0.94);
+  --overlay-scrim-soft: rgba(255, 245, 247, 0.82);
+  --code-bg: #fff0f4;
   --code-border: 1px solid transparent;
-  --code-fg: #be185d;
-  --input-border: 2px solid transparent;
-  --input-border-focus: 2px solid #f9a8d4;
-  --input-fg: #9d174d;
-  --input-caret: #f472b6;
-  --input-bg: linear-gradient(to bottom, #f3f4f6, #e5e7eb);
-  --placeholder-fg: rgba(157, 23, 77, 0.45);
-  --input-focus-shadow: inset 4px 4px 8px rgba(0, 0, 0, 0.1),
-    inset -4px -4px 8px rgba(255, 255, 255, 0.9), 0 0 0 4px rgba(248, 180, 217, 0.3);
-  --note-bg: linear-gradient(to bottom right, #ffffff, #fdf2f8);
-  --note-border: 1px solid transparent;
-  --note-shadow: 8px 8px 16px rgba(0, 0, 0, 0.1), inset 4px 4px 8px rgba(255, 255, 255, 0.4),
-    inset -2px -2px 4px rgba(0, 0, 0, 0.1);
-  --stat-bg: linear-gradient(to bottom right, #ffffff, #fdf2f8);
-  --stat-border: 1px solid transparent;
-  --stat-shadow: 8px 8px 16px rgba(0, 0, 0, 0.1), inset 4px 4px 8px rgba(255, 255, 255, 0.4),
-    inset -2px -2px 4px rgba(0, 0, 0, 0.1);
-  --progress-bg: linear-gradient(to bottom, #fce7f3, #fbcfe8);
-  --progress-fill: #f472b6;
-  --progress-shadow: inset 2px 2px 4px rgba(0, 0, 0, 0.08);
+  --code-fg: #a84a66;
+  --input-border: 2px solid rgba(255, 183, 197, 0.25);
+  --input-border-focus: 2px solid #ffb7c5;
+  --input-fg: #4a5568;
+  --input-caret: #ff9db4;
+  --input-bg: #fff5f7;
+  --placeholder-fg: rgba(74, 85, 104, 0.42);
+  --input-focus-shadow: 0 0 0 4px rgba(255, 183, 197, 0.3), 0 4px 18px rgba(255, 183, 197, 0.35);
+  --note-bg: #ffffff;
+  --note-border: 2px solid rgba(255, 183, 197, 0.2);
+  --note-shadow: 0 4px 18px rgba(255, 183, 197, 0.22);
+  --stat-bg: #ffffff;
+  --stat-border: 2px solid rgba(255, 183, 197, 0.2);
+  --stat-shadow: 0 4px 18px rgba(255, 183, 197, 0.22);
+  --progress-bg: #fff0f4;
+  --progress-fill: linear-gradient(to right, #ffc9d4, #ffb7c5);
+  --progress-shadow: inset 0 1px 3px rgba(255, 183, 197, 0.35);
   --progress-radius: 999px;
-  /* 进度条不共用 --ease：弹簧曲线的 overshoot 会让宽度冲过 100% 再弹回 */
-  --progress-transition: width 300ms cubic-bezier(0.22, 1, 0.36, 1);
+  --progress-transition: width 300ms cubic-bezier(0.4, 0, 0.2, 1);
   --badge-radius: 999px;
   --badge-border-w: 1px;
   --dot-radius: 999px;
   --btn-border-w: 2px;
-  --badge-good-bg: rgba(21, 128, 61, 0.14);
-  --badge-good-fg: #15803d;
-  --badge-warn-bg: rgba(180, 83, 9, 0.14);
-  --badge-warn-fg: #b45309;
-  --badge-bad-bg: rgba(220, 38, 38, 0.14);
-  --badge-bad-fg: #dc2626;
+  --badge-good-bg: rgba(79, 157, 127, 0.14);
+  --badge-good-fg: #3d7d64;
+  --badge-warn-bg: rgba(184, 129, 63, 0.14);
+  --badge-warn-fg: #96682f;
+  --badge-bad-bg: rgba(209, 67, 91, 0.14);
+  --badge-bad-fg: #b3374c;
   --disabled-opacity: 0.5;
 
-  --pick-active-bg: rgba(244, 114, 182, 0.2);
-  --pick-active-fg: #9d174d;
-  --pick-active-border-c: #f472b6;
+  --pick-active-bg: rgba(255, 183, 197, 0.22);
+  --pick-active-fg: #8f2f4d;
+  --pick-active-border-c: #ffb7c5;
 
   color-scheme: light;
 }
@@ -918,7 +914,7 @@ body {
   z-index: 1000;
   overflow: hidden;
   /* 默认主题的 --bg 是纯色，可以直接放在 --text 帘幕上。
-     粘土/霓虹的 --bg 是渐变，下面单独回退到纯色 --on-accent。 */
+     霓虹的 --bg 是渐变，下面单独回退到纯色 --on-accent。 */
   --entry-loader-fg: var(--bg);
   color: var(--entry-loader-fg);
   user-select: none;
@@ -927,7 +923,6 @@ body {
   isolation: isolate;
 }
 
-:root[data-theme='clay'] .entry-loader,
 :root[data-theme='vapor'] .entry-loader {
   --entry-loader-fg: var(--on-accent);
 }
@@ -1183,7 +1178,6 @@ body {
   text-align: center;
 }
 
-:root[data-theme='clay'] .screen-transition__label,
 :root[data-theme='vapor'] .screen-transition__label {
   --transition-fg: var(--on-accent);
 }
@@ -1575,7 +1569,7 @@ button.ghost {
   --btn-bg-hover: var(--surface); /* hover 只上浮，不改底色，免得渐变跳一下 */
   --btn-fg: var(--text);
   --btn-fg-hover: var(--text);
-  /* 选项底色与卡片同源（都是 --surface），不给边框的话粘土主题下两者直接糊在一起
+  /* 选项底色与卡片同源（都是 --surface），不给边框的话浅色主题下两者直接糊在一起
    * ——那边的 --card-border 是透明的。用 --divider，三套主题各自有值。 */
   --btn-border-c: var(--divider);
   --btn-border-c-hover: var(--divider);
