@@ -11,8 +11,9 @@ import {
   normalizeApproachMs,
   type Settings,
 } from '../state/settings'
-import { keyHint } from '../core/input'
+import { keyHint, type KeyBindings, type KeyColumns } from '../core/keymap'
 import { ThemePicker } from './ThemePicker'
+import { KeyBindingEditor } from './KeyBindingEditor'
 
 interface Props {
   settings: Settings
@@ -41,6 +42,17 @@ function fallSpeedLabel(approachMs: number): string {
   if (approachMs >= 800) return '标准'
   if (approachMs >= 650) return '快'
   return '很快'
+}
+
+function withKeyBindings(
+  settings: Settings,
+  columns: KeyColumns,
+  bindings: readonly string[],
+): KeyBindings {
+  return {
+    4: columns === 4 ? [...bindings] : settings.keyBindings[4],
+    6: columns === 6 ? [...bindings] : settings.keyBindings[6],
+  }
 }
 
 export function SongSelect(props: Props) {
@@ -92,8 +104,16 @@ export function SongSelect(props: Props) {
             </button>
           ))}
         </div>
+        <h2 style={{ marginTop: 16 }}>键位</h2>
+        <KeyBindingEditor
+          columns={settings.columns}
+          value={settings.keyBindings[settings.columns]}
+          onChange={(bindings) =>
+            onChange({ keyBindings: withKeyBindings(settings, settings.columns, bindings) })
+          }
+        />
         <p className="muted" style={{ marginTop: 8 }}>
-          键位：{keyHint(settings.columns)}
+          当前：{keyHint(settings.columns, settings.keyBindings)}
         </p>
 
         <h2 style={{ marginTop: 16 }}>下落速度</h2>

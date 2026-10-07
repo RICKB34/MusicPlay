@@ -1892,6 +1892,84 @@ input[type='range'] {
   min-height: 44px;
 }
 
+.keybindings {
+  margin-top: 10px;
+}
+
+.keybinding-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.keybinding-key {
+  --btn-bg: var(--input-bg);
+  --btn-fg: var(--input-fg);
+  --btn-border-c: var(--divider);
+  --btn-bg-hover: var(--input-bg);
+  --btn-fg-hover: var(--accent-text);
+  --btn-border-c-hover: var(--accent);
+  --btn-shadow: none;
+  --btn-shadow-hover: none;
+  --btn-shadow-active: none;
+  --lift: none;
+  --press: none;
+  display: flex;
+  min-width: 0;
+  min-height: 58px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 7px 5px;
+}
+
+.keybinding-key[data-capturing='true'] {
+  --btn-border-c: var(--accent);
+  --btn-fg: var(--accent-text);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.keybinding-key__lane {
+  font-size: 10px;
+  line-height: 1;
+  color: var(--text-dim);
+  text-transform: var(--tt-label);
+  letter-spacing: var(--ls-label);
+}
+
+.keybinding-key__value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 18px;
+  line-height: 1.05;
+}
+
+.keybinding-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.keybinding-actions .muted {
+  min-width: 180px;
+  flex: 1;
+}
+
+.keybinding-actions button {
+  min-height: 36px;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.keybinding-notice {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--warning);
+}
+
 /* ══════════════ 遮罩 ══════════════
  * 倒计时数字的颜色继承自 body 的 --text，所以遮罩必须跟着主题走：
  * QQ 主题下 --text 是深色，配深色遮罩会让倒计时直接消失。

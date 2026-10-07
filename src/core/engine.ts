@@ -49,6 +49,8 @@ export interface EngineOptions {
   theme?: RenderTheme
   /** 显示判定偏差数值（调试用）。 */
   showDelta?: boolean
+  /** 每轨的 KeyboardEvent.code，顺序与 chart.columns 一致。 */
+  keyBindings?: readonly string[]
   /**
    * 鼓点序列（秒 + 强度），从原曲起音中筛出，见 `analysis/drumHit.ts`。
    *
@@ -165,6 +167,7 @@ export class RhythmGame {
 
     this.input = new InputManager(opts.canvas, {
       columns: opts.chart.columns,
+      keyBindings: opts.keyBindings,
       // 传入 getter 而非快照值：判定必须读到"按下那一刻"的时钟
       getSongTime: () => this.clock.songTime(),
       onLaneDown: (lane, t) => this.handleLaneDown(lane, t),
